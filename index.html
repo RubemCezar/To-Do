@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#4f46e5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Tarefas">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Minhas Tarefas</title>
+<style>
+:root{--bg:#f7f7f5;--card:#fff;--text:#1c1c1e;--muted:#8a8a8e;--line:#ececea;--accent:#4f46e5;--high:#e5484d;--mid:#f5a524;--low:#30a46c}
+@media (prefers-color-scheme:dark){:root{--bg:#121214;--card:#1c1c1f;--text:#f2f2f3;--muted:#8d8d93;--line:#2a2a2e;--accent:#818cf8}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:calc(90px + env(safe-area-inset-bottom))}
+header{padding:calc(20px + env(safe-area-inset-top)) 20px 8px}
+h1{margin:0;font-size:28px;font-weight:700}
+.sub{color:var(--muted);font-size:14px;margin-top:2px}
+.tabs{display:flex;gap:8px;padding:12px 20px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;border:1px solid var(--line);background:var(--card);color:var(--text);padding:7px 14px;border-radius:999px;font-size:14px;cursor:pointer}
+.tab.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tab.add{color:var(--muted);border-style:dashed}
+.filters{display:flex;gap:16px;padding:0 20px 8px;font-size:14px;color:var(--muted)}
+.filters button{background:none;border:0;color:inherit;padding:4px 0;font:inherit;cursor:pointer}
+.filters button.on{color:var(--text);font-weight:600;border-bottom:2px solid var(--accent)}
+ul{list-style:none;margin:0;padding:0 16px}
+li{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:14px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.chk{flex:none;width:24px;height:24px;border-radius:50%;border:2px solid var(--muted);background:none;cursor:pointer;display:grid;place-items:center;padding:0}
+li.done .chk{background:var(--accent);border-color:var(--accent)}
+li.done .chk::after{content:"✓";color:#fff;font-size:14px;line-height:1}
+.body{flex:1;min-width:0;cursor:pointer}
+.t{overflow-wrap:anywhere}
+li.done .t{text-decoration:line-through;color:var(--muted)}
+.meta{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted);margin-top:2px}
+.meta .late{color:var(--high);font-weight:600}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.p-alta{background:var(--high)}.p-media{background:var(--mid)}.p-baixa{background:var(--low)}
+.del{border:0;background:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px 6px}
+.empty{text-align:center;color:var(--muted);padding:48px 20px}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--bg);padding:10px 16px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line);display:flex;gap:8px}
+.bar input{flex:1;min-width:0;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:12px;padding:12px 14px;font:inherit}
+.bar button{border:0;background:var(--accent);color:#fff;border-radius:12px;width:48px;font-size:24px;cursor:pointer}
+dialog{border:0;border-radius:18px;padding:20px;width:min(92vw,420px);background:var(--card);color:var(--text)}
+dialog::backdrop{background:rgba(0,0,0,.4)}
+dialog label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px}
+dialog input,dialog select{width:100%;border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:10px;padding:10px;font:inherit}
+.row{display:flex;gap:8px;margin-top:18px}
+.row button{flex:1;border:0;border-radius:10px;padding:11px;font:inherit;cursor:pointer;background:var(--line);color:var(--text)}
+.row .pri{background:var(--accent);color:#fff}
+</style>
+</head>
+<body>
+<header><h1>Tarefas</h1><div class="sub" id="sub"></div></header>
+<div class="tabs" id="tabs"></div>
+<div class="filters" id="filters"></div>
+<ul id="list"></ul>
+<div class="empty" id="empty" hidden>Nada por aqui. Adicione sua primeira tarefa ✨</div>
+
+<form class="bar" id="form">
+  <input id="newTask" placeholder="Nova tarefa…" autocomplete="off" aria-label="Nova tarefa">
+  <button aria-label="Adicionar">+</button>
+</form>
+
+<dialog id="dlg">
+  <form method="dialog" id="editForm">
+    <strong>Editar tarefa</strong>
+    <label>Título</label><input id="eTitle" required>
+    <label>Prazo</label><input id="eDate" type="date">
+    <label>Prioridade</label>
+    <select id="ePrio"><option value="baixa">Baixa</option><option value="media">Média</option><option value="alta">Alta</option></select>
+    <label>Lista</label><select id="eList"></select>
+    <div class="row"><button type="button" id="eCancel">Cancelar</button><button class="pri" value="ok">Salvar</button></div>
+  </form>
+</dialog>
+
+<script>
+const KEY='tarefas.v1';
+let state;
+try{state=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!state||!state.tasks)state={lists:['Geral'],tasks:[]};
+let curList='Todas',filter='abertas',editId=null;
+const $=id=>document.getElementById(id);
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const fmt=s=>{const[y,m,d]=s.split('-');return d+'/'+m};
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pw={alta:0,media:1,baixa:2};
+
+function render(){
+  const open=state.tasks.filter(t=>!t.done).length;
+  $('sub').textContent=open?open+(open>1?' pendentes':' pendente'):'Tudo em dia 🎉';
+  const names=['Todas',...state.lists];
+  $('tabs').innerHTML=names.map(n=>`<button class="tab ${n===curList?'on':''}" data-l="${esc(n)}">${esc(n)}</button>`).join('')+'<button class="tab add" data-add="1">+ Lista</button>';
+  $('filters').innerHTML=[['abertas','Abertas'],['feitas','Concluídas'],['todas','Todas']].map(([k,l])=>`<button class="${filter===k?'on':''}" data-f="${k}">${l}</button>`).join('');
+  let ts=state.tasks.filter(t=>curList==='Todas'||t.list===curList);
+  if(filter==='abertas')ts=ts.filter(t=>!t.done);
+  if(filter==='feitas')ts=ts.filter(t=>t.done);
+  ts.sort((a,b)=>a.done-b.done||(a.date||'9')<(b.date||'9')?-1:(a.date||'9')>(b.date||'9')?1:pw[a.prio]-pw[b.prio]);
+  $('list').innerHTML=ts.map(t=>{
+    const late=t.date&&!t.done&&t.date<today();
+    return `<li class="${t.done?'done':''}" data-id="${t.id}">
+      <button class="chk" data-a="toggle" aria-label="Concluir"></button>
+      <div class="body" data-a="edit"><div class="t">${esc(t.title)}</div>
+        <div class="meta"><span class="dot p-${t.prio}"></span><span>${esc(t.list)}</span>${t.date?`<span class="${late?'late':''}">${t.date===today()?'Hoje':fmt(t.date)}</span>`:''}</div></div>
+      <button class="del" data-a="del" aria-label="Apagar">×</button></li>`}).join('');
+  $('empty').hidden=ts.length>0;
+}
+
+$('form').onsubmit=e=>{
+  e.preventDefault();
+  const v=$('newTask').value.trim(); if(!v)return;
+  state.tasks.push({id:uid(),title:v,done:false,prio:'media',date:'',list:curList==='Todas'?state.lists[0]:curList});
+  $('newTask').value='';save();render();
+};
+$('list').onclick=e=>{
+  const b=e.target.closest('[data-a]'); if(!b)return;
+  const id=b.closest('li').dataset.id, t=state.tasks.find(x=>x.id===id);
+  if(b.dataset.a==='toggle'){t.done=!t.done;save();render()}
+  else if(b.dataset.a==='del'){state.tasks=state.tasks.filter(x=>x.id!==id);save();render()}
+  else{editId=id;$('eTitle').value=t.title;$('eDate').value=t.date;$('ePrio').value=t.prio;
+    $('eList').innerHTML=state.lists.map(l=>`<option ${l===t.list?'selected':''}>${esc(l)}</option>`).join('');$('dlg').showModal()}
+};
+$('editForm').onsubmit=()=>{
+  const t=state.tasks.find(x=>x.id===editId); if(!t)return;
+  t.title=$('eTitle').value.trim()||t.title;t.date=$('eDate').value;t.prio=$('ePrio').value;t.list=$('eList').value;save();render();
+};
+$('eCancel').onclick=()=>$('dlg').close();
+$('tabs').onclick=e=>{
+  const b=e.target.closest('.tab'); if(!b)return;
+  if(b.dataset.add){const n=(prompt('Nome da nova lista:')||'').trim();
+    if(n&&!state.lists.includes(n)&&n!=='Todas'){state.lists.push(n);curList=n;save()}}
+  else curList=b.dataset.l;
+  render();
+};
+$('filters').onclick=e=>{const b=e.target.closest('[data-f]');if(b){filter=b.dataset.f;render()}};
+render();
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
