@@ -2,11 +2,16 @@
 
 App de lista de tarefas (PWA): limpo, offline e instalável no Android e no iPhone.
 
-- Tarefas com prazo e prioridade
-- Listas personalizadas
-- Modo escuro automático
-- Dados salvos no próprio aparelho
+**Site:** https://rubemcezar.github.io/To-Do/
+
+## Funcionalidades
+- Visões **Hoje** (com progresso do dia), **Em breve** e **Todas**, mais listas coloridas
+- **Adição rápida em português:** `estudar civil amanhã !alta #Faculdade`, `academia toda segunda`, `prova 20/12`
+- Tarefas que **se repetem** (todo dia, semana ou mês)
+- **Subtarefas**, notas, prioridade e data em cada tarefa
+- Busca, desfazer ao concluir ou excluir, backup (exportar e importar)
+- Modo escuro automático; funciona offline; dados salvos no próprio aparelho
 
 ## Como instalar
-- **Android (Chrome):** menu ⋮ → "Instalar app"
+- **Android (Chrome):** menu ⋮ → "Adicionar à tela inicial" / "Instalar app"
 - **iPhone (Safari):** Compartilhar → "Adicionar à Tela de Início"
