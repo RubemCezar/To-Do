@@ -9,6 +9,8 @@ App de lista de tarefas (PWA): limpo, offline e instalável no Android e no iPho
 - **Adição rápida em português:** `estudar civil amanhã !alta #Faculdade`, `academia toda segunda`, `prova 20/12`
 - Tarefas que **se repetem** (todo dia, semana ou mês)
 - **Subtarefas**, notas, prioridade e data em cada tarefa
+- **Calendário** mensal com pontos nos dias que têm tarefas
+- **Horário e lembretes** (`reunião às 15h30`), com notificação enquanto o app está aberto ou ao abrir
 - Busca, desfazer ao concluir ou excluir, backup (exportar e importar)
 - Modo escuro automático; funciona offline; dados salvos no próprio aparelho
 
