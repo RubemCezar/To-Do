@@ -255,6 +255,14 @@ function parseQuick(raw){
   take(/\bdepois de amanha\b/,()=>out.date=ymd(addDays(new Date(),2)));
   take(/\bamanha\b/,()=>out.date=ymd(addDays(new Date(),1)));
   take(/\bhoje\b/,()=>out.date=ymd(new Date()));
+  take(/\b(semana que vem|proxima semana)\b/,()=>out.date=ymd(addDays(new Date(),7)));
+  take(/\bdia ([1-9]|[12]\d|3[01])\b/,m=>{
+    const d=+m[1],now=new Date();let mo=now.getMonth();
+    if(d<now.getDate())mo++;
+    const dt=new Date(now.getFullYear(),mo,d);
+    if(dt.getDate()!==d)return false;
+    out.date=ymd(dt);
+  });
   take(/\b(todo dia|todos os dias|diariamente)\b/,()=>out.repeat='daily');
   take(/\b(toda semana|semanalmente)\b/,()=>out.repeat='weekly');
   take(/\b(todo mes|mensalmente)\b/,()=>out.repeat='monthly');
@@ -278,6 +286,13 @@ function parseQuick(raw){
     out.date=ymd(dt);
   });
   take(/(^|\s)!(alta|media|baixa|1|2|3)\b/,m=>{out.prio={alta:'alta',1:'alta',media:'media',2:'media',baixa:'baixa',3:'baixa'}[m[2]]});
+  take(/\bprioridade (alta|media|baixa)\b/,m=>{out.prio=m[1]});
+  take(/\b(muito )?urgente\b/,()=>{out.prio='alta'});
+  for(const l of state.lists){
+    const re=new RegExp('\\bna (?:minha )?lista (?:de |da |do )?'+norm(l).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b');
+    const lm2=re.exec(n);
+    if(lm2){out.list=l;cut.push([lm2.index,lm2.index+lm2[0].length]);n=n.slice(0,lm2.index)+'\u0001'.repeat(lm2[0].length)+n.slice(lm2.index+lm2[0].length);break}
+  }
   const lm=/(^|\s)#([a-z0-9_-]+)/.exec(n);
   if(lm){const found=state.lists.find(l=>norm(l).replace(/\s+/g,'-')===lm[2]);
     if(found){out.list=found;cut.push([lm.index,lm.index+lm[0].length])}}

@@ -77,7 +77,27 @@
             "guardar {tarefa}",
             "registrar {tarefa}",
             "agendar {tarefa}",
-            "marcar {tarefa}"
+            "marcar {tarefa}",
+            "acrescente {tarefa}",
+            "acrescentar {tarefa}",
+            "ponha {tarefa}",
+            "ponha na lista {tarefa}",
+            "põe {tarefa}",
+            "põe na lista {tarefa}",
+            "adicionar item {tarefa}",
+            "adicione o item {tarefa}",
+            "novo item {tarefa}",
+            "incluir tarefa {tarefa}",
+            "anotar tarefa {tarefa}",
+            "anote a tarefa {tarefa}",
+            "lembrete {tarefa}",
+            "novo lembrete {tarefa}",
+            "me avise de {tarefa}",
+            "não me deixe esquecer {tarefa}",
+            "não esquecer {tarefa}",
+            "falta {tarefa}",
+            "quero lembrar de {tarefa}",
+            "precisa {tarefa}"
           ]
         }
       ],
