@@ -5,11 +5,11 @@
         "pt-BR": {
           "summary": "Diga o que você precisa fazer e a tarefa vai para o seu app.",
           "examplePhrases": [
-            "Alexa, abra meu caderno",
-            "Alexa, peça ao meu caderno para adicionar comprar pão",
-            "Alexa, abra meu caderno e anote ligar para o dentista amanhã"
+            "Alexa, abra minha lista",
+            "Alexa, peça à minha lista para adicionar comprar pão",
+            "Alexa, abra minha lista e anote ligar para o dentista amanhã"
           ],
-          "name": "Meu Caderno",
+          "name": "Minha Lista",
           "description": "Diga o que você precisa fazer e a tarefa é enviada para o seu app de lista de tarefas, com data, horário e prioridade se você falar."
         }
       },

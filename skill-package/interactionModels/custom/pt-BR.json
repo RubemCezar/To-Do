@@ -1,7 +1,7 @@
 {
   "interactionModel": {
     "languageModel": {
-      "invocationName": "meu caderno",
+      "invocationName": "minha lista",
       "intents": [
         {
           "name": "AMAZON.CancelIntent",

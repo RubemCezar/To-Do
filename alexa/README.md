@@ -9,6 +9,7 @@ Fluxo: **Alexa → skill (Alexa-hosted) → Worker da Cloudflare (D1) → app bu
 - No app: menu ⋯ → "Conectar Alexa" e colar o código de conexão (fica só no aparelho, fora do backup).
 
 ## Nome de chamada
-O nome **"meu caderno"** foi escolhido de propósito: "minhas tarefas" colide com a lista de tarefas nativa da Alexa, que responde no lugar da skill.
-Exemplos: "Alexa, peça ao meu caderno para adicionar comprar pão amanhã" · "Alexa, abra meu caderno".
-Ao importar a skill, o console reseta o nome para "change me": ajuste em Build → Invocations (ou no JSON Editor) e faça Build.
+Nome atual: **"minha lista"**. Testado no simulador: "abra minha lista" e "peça à minha lista para adicionar …" chamam a skill.
+Atenção: "minhas tarefas" colide com a lista nativa da Alexa (que responde no lugar da skill). A frase sem "peça à/ao" ("adicione X na minha lista") **sempre** vai para a lista nativa: a Amazon encerrou a List Skill API em 01/07/2024 e não há como redirecioná-la.
+Resposta "Pronto/Feito/Beleza, adicionei…" = foi para o app. "Incluí … na sua lista de tarefas" = foi para a lista nativa.
+Ao importar a skill, o console reseta o nome para "change me": ajuste em Build → JSON Editor e faça Build.
