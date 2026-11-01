@@ -5,11 +5,11 @@
         "pt-BR": {
           "summary": "Diga o que você precisa fazer e a tarefa vai para o seu app.",
           "examplePhrases": [
-            "Alexa, abra minhas tarefas",
-            "Alexa, peça às minhas tarefas para adicionar comprar pão",
-            "Alexa, abra minhas tarefas e anote ligar para o dentista amanhã"
+            "Alexa, abra meu caderno",
+            "Alexa, peça ao meu caderno para adicionar comprar pão",
+            "Alexa, abra meu caderno e anote ligar para o dentista amanhã"
           ],
-          "name": "Minhas Tarefas",
+          "name": "Meu Caderno",
           "description": "Diga o que você precisa fazer e a tarefa é enviada para o seu app de lista de tarefas, com data, horário e prioridade se você falar."
         }
       },
@@ -18,7 +18,9 @@
       "category": "ORGANIZERS_AND_ASSISTANTS",
       "distributionCountries": []
     },
-    "apis": { "custom": {} },
+    "apis": {
+      "custom": {}
+    },
     "manifestVersion": "1.0",
     "permissions": [],
     "privacyAndCompliance": {
