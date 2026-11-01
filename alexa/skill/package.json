@@ -1,0 +1,10 @@
+{
+  "name": "minhas-tarefas",
+  "version": "1.0.0",
+  "description": "Skill que envia tarefas ditas à Alexa para a caixa de entrada do app Tarefas",
+  "main": "index.js",
+  "dependencies": {
+    "ask-sdk-core": "^2.14.0",
+    "ask-sdk-model": "^1.86.0"
+  }
+}

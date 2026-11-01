@@ -96,6 +96,7 @@ dialog::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(2px)}
 .menu button{display:block;width:100%;text-align:left;border:0;background:none;padding:14px 4px;font-size:16px;cursor:pointer;border-bottom:1px solid var(--line)}
 .menu button.dng{color:var(--high)}
 .menu small{display:block;color:var(--muted);margin-top:14px}
+#aMsg{display:block;min-height:1.2em;margin-top:8px;font-size:13px;color:var(--high)}
 .cal{margin:8px 16px 4px;background:var(--card);border-radius:18px;padding:12px;box-shadow:var(--shadow)}
 .calhd{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
 .calhd .ib{width:34px;height:34px;box-shadow:none;background:var(--bg);font-size:20px;line-height:1}
@@ -174,11 +175,22 @@ dialog::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(2px)}
   </form>
 </dialog>
 
+<dialog id="alexaDlg">
+  <div class="sh">
+    <strong>Conectar Alexa</strong>
+    <label for="aCode">Código de conexão</label>
+    <textarea id="aCode" rows="3" placeholder="Cole aqui o código de conexão" autocomplete="off" spellcheck="false"></textarea>
+    <small id="aMsg"></small>
+    <div class="acts"><button type="button" id="aCancel">Cancelar</button><button type="button" class="pri" id="aGo">Conectar</button></div>
+  </div>
+</dialog>
+
 <dialog id="menuDlg">
   <div class="sh menu">
     <strong>Mais opções</strong>
     <button id="mRename" hidden>Renomear esta lista</button>
     <button id="mDelList" class="dng" hidden>Excluir esta lista</button>
+    <button id="mAlexa">Conectar Alexa</button>
     <button id="mNotify">Ativar notificações</button>
     <small style="margin:-6px 0 6px">Os lembretes aparecem enquanto o app está aberto (ou quando você abrir). Para avisar com o app fechado seria preciso um servidor de notificações.</small>
     <button id="mExport">Exportar backup</button>
@@ -224,7 +236,7 @@ function normalize(s){
   s.tasks=s.tasks.map(t=>({id:t.id||uid(),title:String(t.title||''),done:!!t.done,prio:PW[t.prio]!==undefined?t.prio:'media',
     date:t.date||'',list:s.lists.includes(t.list)?t.list:s.lists[0],notes:t.notes||'',
     subs:Array.isArray(t.subs)?t.subs.map(x=>({t:String(x.t||''),done:!!x.done})):[],repeat:t.repeat||'',doneAt:t.doneAt||'',created:t.created||0,
-    time:/^\d{2}:\d{2}$/.test(t.time||'')?t.time:'',remind:typeof t.remind==='string'?t.remind:'',notified:t.notified||''}));
+    time:/^\d{2}:\d{2}$/.test(t.time||'')?t.time:'',remind:typeof t.remind==='string'?t.remind:'',notified:t.notified||'',src:t.src||''}));
   s.settings={notify:!!(s.settings&&s.settings.notify)};
   return s;
 }
@@ -253,7 +265,7 @@ function parseQuick(raw){
     if(m[1]&&/^tod/.test(m[1])&&!out.repeat)out.repeat='weekly';
   });
   // horário: "às 15h", "as 15h30", "15:30", "15h30"; "15h" sozinho só vale a partir das 7h (evita "estudar 3h")
-  take(/\b(as\s+)?([01]?\d|2[0-3])h([0-5]\d)?\b/,m=>{
+  take(/\b(as\s+)?([01]?\d|2[0-3])\s?(?:h|horas?)([0-5]\d)?\b/,m=>{
     if(!m[1]&&!m[3]&&+m[2]<7)return false;
     out.time=pad(+m[2])+':'+pad(m[3]?+m[3]:0);
   });
@@ -514,7 +526,7 @@ $('eform').addEventListener('submit',()=>{
 });
 $('eCancel').onclick=()=>$('sheet').close();
 $('eDel').onclick=()=>{$('sheet').close();removeTask(editId)};
-for(const id of ['sheet','nameDlg','menuDlg'])$(id).addEventListener('click',e=>{if(e.target===$(id))$(id).close()});
+for(const id of ['sheet','nameDlg','menuDlg','alexaDlg'])$(id).addEventListener('click',e=>{if(e.target===$(id))$(id).close()});
 
 /* ---------- listas ---------- */
 $('nCancel').onclick=()=>$('nameDlg').close();
@@ -537,6 +549,7 @@ $('btnMenu').onclick=()=>{
   const isList=view.startsWith('l:');
   $('mRename').hidden=!isList;$('mDelList').hidden=!(isList&&state.lists.length>1);
   $('mNotify').textContent=state.settings.notify?'Desativar notificações':'Ativar notificações';
+  $('mAlexa').textContent=alexa?'Alexa conectada ✓ (desconectar)':'Conectar Alexa';
   $('menuDlg').showModal();
 };
 $('mRename').onclick=()=>{$('menuDlg').close();nameMode='rename';$('nameTitle').textContent='Renomear lista';$('nName').value=view.slice(2);$('nameDlg').showModal()};
@@ -552,6 +565,68 @@ $('mClear').onclick=()=>{
   if(!confirm(`Apagar ${n} tarefa(s) concluída(s)? Isso não pode ser desfeito.`))return;
   state.tasks=state.tasks.filter(t=>!t.done);save();render();$('menuDlg').close();
 };
+/* ---------- Alexa: caixa de entrada na nuvem ---------- */
+const AKEY='tarefas.alexa'; // fica fora do backup de propósito (contém a chave)
+let alexa=null;
+try{alexa=JSON.parse(localStorage.getItem(AKEY))}catch(e){}
+if(!alexa||typeof alexa.u!=='string'||typeof alexa.k!=='string')alexa=null;
+
+function taskFromText(text,src){
+  const p=parseQuick(text);let date=p.date||'';
+  if((p.repeat||p.time)&&!date)date=today();
+  const title=p.title.charAt(0).toUpperCase()+p.title.slice(1);
+  return {id:uid(),title,done:false,prio:p.prio||'media',date,list:p.list||state.lists[0],notes:'',subs:[],
+    repeat:p.repeat||'',doneAt:'',created:Date.now(),time:p.time||'',remind:p.time?'0':'',notified:'',src:src||''};
+}
+function decodeCode(c){
+  const t=c.trim().replace(/\s+/g,'').replace(/-/g,'+').replace(/_/g,'/');
+  let o;try{o=JSON.parse(atob(t))}catch(e){return null}
+  if(!o||typeof o.u!=='string'||typeof o.k!=='string'||o.k.length<16)return null;
+  const u=o.u.replace(/\/+$/,'');
+  if(!/^https:\/\/[\w.-]+(:\d+)?(\/[\w./-]*)?$/.test(u)&&!/^http:\/\/localhost(:\d+)?$/.test(u))return null;
+  return {u,k:o.k};
+}
+const aHeaders=extra=>({Authorization:'Bearer '+alexa.k,...(extra||{})});
+let polling=false;
+async function pollAlexa(){
+  if(!alexa||polling||document.hidden)return;
+  polling=true;
+  try{
+    const r=await fetch(alexa.u+'/inbox',{headers:aHeaders(),cache:'no-store'});
+    if(!r.ok)return;
+    const items=(await r.json()).items||[];if(!items.length)return;
+    const novas=[];
+    for(const it of items){
+      if(state.tasks.some(t=>t.src==='alexa:'+it.id))continue;
+      const t=taskFromText(String(it.text||''),'alexa:'+it.id);state.tasks.push(t);novas.push(t);
+    }
+    save();render(); // grava antes de confirmar: se o ack falhar, nada se perde nem duplica
+    await fetch(alexa.u+'/ack',{method:'POST',headers:aHeaders({'Content-Type':'application/json'}),body:JSON.stringify({ids:items.map(i=>i.id)})});
+    if(novas.length){buzz();toast(novas.length===1?'Alexa adicionou: '+novas[0].title:novas.length+' tarefas adicionadas pela Alexa')}
+  }catch(e){}finally{polling=false}
+}
+$('mAlexa').onclick=()=>{
+  if(alexa){
+    if(!confirm('Desconectar a Alexa deste aparelho? As tarefas já importadas continuam aqui.'))return;
+    alexa=null;try{localStorage.removeItem(AKEY)}catch(e){}
+    $('menuDlg').close();toast('Alexa desconectada');return;
+  }
+  $('aCode').value='';$('aMsg').textContent='';$('menuDlg').close();$('alexaDlg').showModal();
+};
+$('aCancel').onclick=()=>$('alexaDlg').close();
+$('aGo').onclick=async()=>{
+  const cfg=decodeCode($('aCode').value);
+  if(!cfg){$('aMsg').textContent='Código inválido. Copie o código inteiro e cole de novo.';return}
+  $('aMsg').textContent='Testando conexão…';
+  try{
+    const r=await fetch(cfg.u+'/inbox',{headers:{Authorization:'Bearer '+cfg.k},cache:'no-store'});
+    if(r.status===401){$('aMsg').textContent='A chave foi recusada pelo servidor.';return}
+    if(!r.ok){$('aMsg').textContent='O servidor respondeu com erro ('+r.status+').';return}
+  }catch(e){$('aMsg').textContent='Não consegui falar com o servidor. Confira a internet.';return}
+  alexa=cfg;try{localStorage.setItem(AKEY,JSON.stringify(cfg))}catch(e){}
+  $('alexaDlg').close();toast('Alexa conectada');pollAlexa();
+};
+
 async function notify(title,body,tag){
   try{const reg=await navigator.serviceWorker.getRegistration();
     if(reg){await reg.showNotification(title,{body,tag,icon:'icon-192.png',badge:'icon-192.png'});return}}catch(e){}
@@ -604,8 +679,10 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had&&!reloaded){reloaded=true;location.reload()}});
   navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
-document.addEventListener('visibilitychange',()=>{if(!document.hidden){render();checkReminders()}});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){render();checkReminders();pollAlexa()}});
+window.addEventListener('online',pollAlexa);
 setInterval(checkReminders,30000);checkReminders();
+setInterval(pollAlexa,45000);pollAlexa();
 </script>
 </body>
 </html>

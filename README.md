@@ -11,6 +11,7 @@ App de lista de tarefas (PWA): limpo, offline e instalável no Android e no iPho
 - **Subtarefas**, notas, prioridade e data em cada tarefa
 - **Calendário** mensal com pontos nos dias que têm tarefas
 - **Horário e lembretes** (`reunião às 15h30`), com notificação enquanto o app está aberto ou ao abrir
+- **Alexa** (em configuração): dizer uma tarefa para a Alexa e ela aparecer no app — ver `alexa/`
 - Busca, desfazer ao concluir ou excluir, backup (exportar e importar)
 - Modo escuro automático; funciona offline; dados salvos no próprio aparelho
 

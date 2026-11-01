@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS inbox (
+  id   TEXT PRIMARY KEY,
+  text TEXT NOT NULL,
+  at   INTEGER NOT NULL
+);

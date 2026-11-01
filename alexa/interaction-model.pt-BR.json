@@ -1,0 +1,87 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "minhas tarefas",
+      "intents": [
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.FallbackIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        },
+        {
+          "name": "AddTaskIntent",
+          "slots": [
+            {
+              "name": "tarefa",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "adicionar {tarefa}",
+            "adicione {tarefa}",
+            "adiciona {tarefa}",
+            "adicionar tarefa {tarefa}",
+            "adicione a tarefa {tarefa}",
+            "adicionar na lista {tarefa}",
+            "adicione na lista {tarefa}",
+            "adicione na minha lista {tarefa}",
+            "adicionar na minha lista {tarefa}",
+            "anotar {tarefa}",
+            "anote {tarefa}",
+            "anota {tarefa}",
+            "anotar na lista {tarefa}",
+            "anote na minha lista {tarefa}",
+            "colocar {tarefa}",
+            "coloque {tarefa}",
+            "coloca {tarefa}",
+            "colocar na lista {tarefa}",
+            "coloque na minha lista {tarefa}",
+            "coloca na lista {tarefa}",
+            "incluir {tarefa}",
+            "inclua {tarefa}",
+            "inclui {tarefa}",
+            "incluir na lista {tarefa}",
+            "inclua na minha lista {tarefa}",
+            "criar tarefa {tarefa}",
+            "crie a tarefa {tarefa}",
+            "cria uma tarefa {tarefa}",
+            "criar uma tarefa {tarefa}",
+            "nova tarefa {tarefa}",
+            "uma nova tarefa {tarefa}",
+            "me lembre de {tarefa}",
+            "me lembra de {tarefa}",
+            "lembrar de {tarefa}",
+            "lembre de {tarefa}",
+            "não me deixe esquecer de {tarefa}",
+            "não esquecer de {tarefa}",
+            "eu preciso {tarefa}",
+            "preciso {tarefa}",
+            "eu tenho que {tarefa}",
+            "tenho que {tarefa}",
+            "salvar {tarefa}",
+            "guardar {tarefa}",
+            "registrar {tarefa}",
+            "agendar {tarefa}",
+            "marcar {tarefa}"
+          ]
+        }
+      ],
+      "types": []
+    }
+  }
+}
