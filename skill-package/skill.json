@@ -5,11 +5,11 @@
         "pt-BR": {
           "summary": "Diga o que você precisa fazer e a tarefa vai para o seu app.",
           "examplePhrases": [
-            "Alexa, peça à minha lista para adicionar pagar a conta",
-            "Alexa, peça à minha lista para adicionar comprar pão",
-            "Alexa, peça à minha lista para anotar ligar para o dentista amanhã"
+            "Alexa, peça às pendências para adicionar pagar a conta",
+            "Alexa, peça às pendências para adicionar comprar pão",
+            "Alexa, peça às pendências para anotar ligar para o dentista amanhã"
           ],
-          "name": "Minha Lista",
+          "name": "Pendências",
           "description": "Diga o que você precisa fazer e a tarefa é enviada para o seu app de lista de tarefas, com data, horário e prioridade se você falar."
         }
       },
