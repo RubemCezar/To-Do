@@ -338,7 +338,8 @@ function parseQuick(raw){
     const AL={compras:['mercado','supermercado','feira']}; // apelidos falados
     const names=[norm(l),...(AL[norm(l)]||[])].map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));
     const re=new RegExp('\\b(?:na|no|em|para a|para o|pra|a) (?:minha )?(?:lista|aba|categoria|secao) (?:de |da |do )?(?:'+names.join('|')+')\\b');
-    const lm2=re.exec(n);
+    let lm2=re.exec(n);
+    if(!lm2&&AL[norm(l)]){const re2=new RegExp('\\b(?:na|no|em|do|da|para o|para a|pro|pra) (?:'+AL[norm(l)].join('|')+')\\b');lm2=re2.exec(n)} // "no mercado" sem a palavra lista
     if(lm2){out.list=l;cut.push([lm2.index,lm2.index+lm2[0].length]);n=n.slice(0,lm2.index)+'\u0001'.repeat(lm2[0].length)+n.slice(lm2.index+lm2[0].length);break}
   }
   const lm=/(^|\s)#([a-z0-9_-]+)/.exec(n);
