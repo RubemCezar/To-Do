@@ -230,19 +230,42 @@ function label(s){
 function listColor(name){let h=0;for(const c of name)h=(h*31+c.charCodeAt(0))>>>0;return PALETTE[h%PALETTE.length]}
 
 /* ---------- estado ---------- */
+const isYmd=s=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&ymd(parseD(s))===s;
 function normalize(s){
   if(!s||!Array.isArray(s.tasks))s={lists:['Geral'],tasks:[]};
-  if(!Array.isArray(s.lists)||!s.lists.length)s.lists=['Geral'];
-  s.tasks=s.tasks.map(t=>({id:t.id||uid(),title:String(t.title||''),done:!!t.done,prio:PW[t.prio]!==undefined?t.prio:'media',
-    date:t.date||'',list:s.lists.includes(t.list)?t.list:s.lists[0],notes:t.notes||'',
-    subs:Array.isArray(t.subs)?t.subs.map(x=>({t:String(x.t||''),done:!!x.done})):[],repeat:t.repeat||'',doneAt:t.doneAt||'',created:t.created||0,
-    time:/^\d{2}:\d{2}$/.test(t.time||'')?t.time:'',remind:typeof t.remind==='string'?t.remind:'',notified:t.notified||'',src:t.src||''}));
-  s.settings={notify:!!(s.settings&&s.settings.notify)};
-  return s;
+  let lists=Array.isArray(s.lists)?s.lists.map(l=>String(l).trim().slice(0,30)).filter(Boolean):[];
+  lists=[...new Set(lists)];if(!lists.length)lists=['Geral'];
+  const seen=new Set();
+  const tasks=s.tasks.filter(t=>t&&typeof t==='object').map(t=>{
+    let id=/^[\w-]{1,40}$/.test(String(t.id||''))?String(t.id):uid();
+    while(seen.has(id))id=uid();seen.add(id);
+    const rm=String(t.remind==null?'':t.remind);
+    return {id,title:String(t.title||''),done:!!t.done,prio:PW[t.prio]!==undefined?t.prio:'media',
+      date:isYmd(t.date)?t.date:'',list:lists.includes(t.list)?t.list:lists[0],notes:String(t.notes||''),
+      subs:Array.isArray(t.subs)?t.subs.filter(x=>x&&typeof x==='object').map(x=>({t:String(x.t||''),done:!!x.done})):[],
+      repeat:REP[t.repeat]?t.repeat:'',anchor:Math.min(31,Math.max(0,Math.floor(+t.anchor)||0)),
+      doneAt:isYmd(t.doneAt)?t.doneAt:'',created:+t.created||0,
+      time:/^\d{2}:\d{2}$/.test(t.time||'')?t.time:'',remind:['','0','10','60','1440'].includes(rm)?rm:'',
+      notified:String(t.notified||''),src:String(t.src||'').slice(0,80)};
+  });
+  return {lists,tasks,settings:{notify:!!(s.settings&&s.settings.notify)}};
 }
 let state;
-try{state=normalize(JSON.parse(localStorage.getItem(KEY)))}catch(e){state=normalize(null)}
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}};
+try{
+  const raw=localStorage.getItem(KEY);
+  try{state=normalize(JSON.parse(raw))}
+  catch(e){ // dados ilegíveis: guarda uma cópia antes que o próximo salvamento sobrescreva
+    if(raw)try{localStorage.setItem(KEY+'.corrompido',raw)}catch(_){}
+    state=normalize(null);
+  }
+}catch(e){state=normalize(null)}
+let saveWarned=false;
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){
+  if(!saveWarned){saveWarned=true;setTimeout(()=>toast('Não consegui salvar neste aparelho. Exporte um backup.'),0)}}};
+window.addEventListener('storage',e=>{ // outra janela/aba do app mexeu nos dados
+  if(e.key!==KEY||!e.newValue)return;
+  try{state=normalize(JSON.parse(e.newValue));render()}catch(_){}
+});
 let view='hoje',showDone=false,searchOn=false,justId=null,draft=null,editId=null,nameMode='new';
 let calSel=today(),calMonth=new Date(new Date().getFullYear(),new Date().getMonth(),1);
 const get=id=>state.tasks.find(t=>t.id===id);
@@ -278,17 +301,19 @@ function parseQuick(raw){
     out.time=pad(+m[2])+':'+pad(m[3]?+m[3]:0);
   });
   take(/\b(as\s+)?([01]?\d|2[0-3]):([0-5]\d)\b/,m=>{out.time=pad(+m[2])+':'+m[3]});
-  take(/\b(\d{1,2})\/(\d{1,2})\b/,m=>{
+  take(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{4}|\d{2}))?\b/,m=>{
     const d=+m[1],mo=+m[2];
     if(mo<1||mo>12||d<1||d>31)return false;
-    const now=new Date();let dt=new Date(now.getFullYear(),mo-1,d);
-    if(ymd(dt)<today())dt=new Date(now.getFullYear()+1,mo-1,d);
+    const now=new Date();let y=m[3]?(m[3].length===2?2000+ +m[3]:+m[3]):now.getFullYear();
+    let dt=new Date(y,mo-1,d);
+    if(dt.getDate()!==d)return false; // dia que não existe no mês (31/02)
+    if(!m[3]&&ymd(dt)<today()){dt=new Date(y+1,mo-1,d);if(dt.getDate()!==d)return false}
     out.date=ymd(dt);
   });
   take(/(^|\s)!(alta|media|baixa|1|2|3)\b/,m=>{out.prio={alta:'alta',1:'alta',media:'media',2:'media',baixa:'baixa',3:'baixa'}[m[2]]});
   take(/\bprioridade (alta|media|baixa)\b/,m=>{out.prio=m[1]});
   take(/\b(muito )?urgente\b/,()=>{out.prio='alta'});
-  for(const l of state.lists){
+  for(const l of [...state.lists].sort((a,b)=>b.length-a.length)){ // nomes maiores primeiro: "Casa nova" antes de "Casa"
     const re=new RegExp('\\bna (?:minha )?lista (?:de |da |do )?'+norm(l).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b');
     const lm2=re.exec(n);
     if(lm2){out.list=l;cut.push([lm2.index,lm2.index+lm2[0].length]);n=n.slice(0,lm2.index)+'\u0001'.repeat(lm2[0].length)+n.slice(lm2.index+lm2[0].length);break}
@@ -309,7 +334,7 @@ function nextDate(t){
   const step=()=>{
     if(t.repeat==='daily')d=addDays(d,1);
     else if(t.repeat==='weekly')d=addDays(d,7);
-    else{const day=d.getDate();d=new Date(d.getFullYear(),d.getMonth()+1,1);
+    else{const day=t.anchor||d.getDate();d=new Date(d.getFullYear(),d.getMonth()+1,1);
       d.setDate(Math.min(day,new Date(d.getFullYear(),d.getMonth()+1,0).getDate()));}
   };
   step();while(ymd(d)<=td)step();
@@ -332,6 +357,7 @@ function toggle(id){
   const snap=JSON.stringify(t);
   const restore=()=>{const i=state.tasks.findIndex(x=>x.id===id);if(i>-1)state.tasks[i]=JSON.parse(snap);save();render()};
   if(!t.done&&t.repeat){
+    if(t.repeat==='monthly'&&!t.anchor)t.anchor=parseD(t.date||today()).getDate(); // lembra o dia 31 mesmo passando por fevereiro
     t.date=nextDate(t);t.notified='';t.subs.forEach(s=>s.done=false);buzz();
     toast('Concluída · repete '+label(t.date).toLowerCase(),restore);
   }else if(!t.done){
@@ -490,7 +516,7 @@ $('form').onsubmit=e=>{
   e.preventDefault();
   const raw=$('newTask').value.trim();if(!raw)return;
   const p=parseQuick(raw);
-  let date=p.date||(view==='hoje'?today():view==='cal'?calSel:'');
+  let date=p.date||(view==='hoje'?today():view==='cal'?calSel:view==='proximas'?ymd(addDays(new Date(),1)):'');
   if((p.repeat||p.time)&&!date)date=today();
   state.tasks.push({id:uid(),title:p.title,done:false,prio:p.prio||'media',date,
     list:p.list||(view.startsWith('l:')?view.slice(2):state.lists[0]),notes:'',subs:[],repeat:p.repeat||'',doneAt:'',created:Date.now(),time:p.time||'',remind:p.time?'0':'',notified:''});
@@ -531,11 +557,12 @@ $('eform').addEventListener('submit',()=>{
   const t=get(editId);if(!t)return;
   const v=$('newSub').value.trim();if(v)draft.subs.push({t:v,done:false});
   t.title=$('eTitle').value.trim()||t.title;t.notes=$('eNotes').value.trim();
-  const oldKey=t.date+'|'+t.time+'|'+t.remind;
+  const oldKey=t.date+'|'+t.time+'|'+t.remind,oldDate=t.date,oldRepeat=t.repeat;
   t.date=$('eDate').value;t.prio=draft.prio;t.repeat=$('eRepeat').value;t.list=$('eList').value;
   t.time=$('eTime').value;t.remind=t.time?$('eRemind').value:'';
   if((t.repeat||t.time)&&!t.date)t.date=today();
   if(t.date+'|'+t.time+'|'+t.remind!==oldKey)t.notified='';
+  if(t.date!==oldDate||t.repeat!==oldRepeat)t.anchor=0;
   t.subs=draft.subs.filter(s=>s.t.trim());
   save();render();
 });
@@ -613,6 +640,7 @@ async function pollAlexa(){
     const novas=[];
     for(const it of items){
       if(state.tasks.some(t=>t.src==='alexa:'+it.id))continue;
+      if(!String(it.text||'').trim())continue;
       const t=taskFromText(String(it.text||''),'alexa:'+it.id);state.tasks.push(t);novas.push(t);
     }
     save();render(); // grava antes de confirmar: se o ack falhar, nada se perde nem duplica
@@ -691,12 +719,16 @@ $('file').onchange=async()=>{
 render();
 if('serviceWorker' in navigator){
   const had=!!navigator.serviceWorker.controller;let reloaded=false;
-  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had&&!reloaded){reloaded=true;location.reload()}});
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had&&!reloaded){reloaded=true;
+    const go=()=>{if(document.querySelector('dialog[open]')||$('newTask').value)setTimeout(go,5000);else location.reload()}; // não perde o que você está digitando
+    go()}});
   navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){render();checkReminders();pollAlexa()}});
 window.addEventListener('online',pollAlexa);
 setInterval(checkReminders,30000);checkReminders();
+let lastDay=today(); // app aberto na virada do dia: atualiza "Hoje" e o calendário
+setInterval(()=>{const d=today();if(d!==lastDay){if(calSel===lastDay)calSel=d;lastDay=d;calMonth=new Date(new Date().getFullYear(),new Date().getMonth(),1);render()}},30000);
 setInterval(pollAlexa,45000);pollAlexa();
 </script>
 </body>

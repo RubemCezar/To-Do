@@ -1,4 +1,4 @@
-const CACHE = 'tarefas-v3';
+const CACHE = 'tarefas-v4';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -18,13 +18,12 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
   e.respondWith(
-    fetch(req)
+    fetch(req, { cache: 'no-cache' }) // ignora o cache HTTP do GitHub Pages: atualização aparece na hora
       .then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(req, copy));
+        if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); } // não guarda páginas de erro
         return res;
       })
-      .catch(() => caches.match(req).then(r => r || caches.match('./index.html')))
+      .catch(() => caches.match(req, { ignoreSearch: true }).then(r => r || caches.match('./index.html')))
   );
 });
 
