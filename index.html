@@ -335,7 +335,9 @@ function parseQuick(raw){
   take(/\bprioridade (alta|media|baixa)\b/,m=>{out.prio=m[1]});
   take(/\b(muito )?urgente\b/,()=>{out.prio='alta'});
   for(const l of [...state.lists].sort((a,b)=>b.length-a.length)){ // nomes maiores primeiro: "Casa nova" antes de "Casa"
-    const re=new RegExp('\\b(?:na|no|em|para a|para o|pra|a) (?:minha )?lista (?:de |da |do )?'+norm(l).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b');
+    const AL={compras:['mercado','supermercado','feira']}; // apelidos falados
+    const names=[norm(l),...(AL[norm(l)]||[])].map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));
+    const re=new RegExp('\\b(?:na|no|em|para a|para o|pra|a) (?:minha )?lista (?:de |da |do )?(?:'+names.join('|')+')\\b');
     const lm2=re.exec(n);
     if(lm2){out.list=l;cut.push([lm2.index,lm2.index+lm2[0].length]);n=n.slice(0,lm2.index)+'\u0001'.repeat(lm2[0].length)+n.slice(lm2.index+lm2[0].length);break}
   }
