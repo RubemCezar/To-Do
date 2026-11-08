@@ -9,7 +9,7 @@ Fluxo: **Alexa → skill (Alexa-hosted) → Worker da Cloudflare (D1) → app bu
 - No app: menu ⋯ → "Conectar Alexa" e colar o código de conexão (fica só no aparelho, fora do backup).
 
 ## Nome de chamada
-Nome atual: **"meu planner"** (em teste; se falhar, voltar para "bloquinho azul", que funcionou). Use a frase completa: **"Alexa, peça ao meu planner para adicionar comprar pão amanhã"**. O comando solto "abra …" não funcionou no aparelho real com nenhum nome (só no simulador).
+Nome atual: **"minha lista"** (em teste no aparelho real). Use SEMPRE a frase completa: **"Alexa, peça à minha lista para adicionar comprar pão amanhã"**. "abra minha lista" vai para a lista de compras nativa. Se o "peça à…" também for para a lista nativa, o plano B que já funcionou no app é "bloquinho azul". "planner" foi descartado: a Alexa às vezes entende "plano".
 Histórico: "planner" (uma palavra) gerou "não é possível iniciar planner neste dispositivo" no Echo; "meu planner" deu o mesmo erro também no app do celular: a Alexa liga "planner" a outra coisa. Use nomes distintivos de duas palavras, sem "meu/minha". "minhas tarefas" colidiu com a lista nativa; "minha lista" passou no simulador mas, no Echo real, a Alexa respondeu com a lista de compras nativa. Evite lista, tarefas, compras, lembretes, agenda e rotina no nome.
 A frase sem "peça ao/à" ("adicione X na minha lista") **sempre** vai para a lista nativa: a Amazon encerrou a List Skill API em 01/07/2024 e não há como redirecioná-la.
 Resposta "Pronto/Feito/Beleza, adicionei…" = foi para o app. "Incluí … na sua lista de tarefas" = foi para a lista nativa.
