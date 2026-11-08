@@ -284,7 +284,7 @@ window.addEventListener('storage',e=>{ // outra janela/aba do app mexeu nos dado
   if(e.key!==KEY||!e.newValue)return;
   try{state=normalize(JSON.parse(e.newValue));render()}catch(_){}
 });
-let view='hoje',showDone=false,searchOn=false,justId=null,draft=null,editId=null,nameMode='new';
+let view=(()=>{try{const v=localStorage.getItem('tarefas.view')||'hoje';return(v==='hoje'||v==='cal'||v.startsWith('l:'))?v:'hoje'}catch(e){return 'hoje'}})(),showDone=false,searchOn=false,justId=null,draft=null,editId=null,nameMode='new';
 let showSoon=false,showNoDate=false;
 let selMode=false,selIds=new Set(),openLi=null,gest=null,suppress=0,lpPending=false; // seleção em massa e deslizar para excluir
 const resetSel=()=>{selMode=false;selIds=new Set()};
@@ -500,6 +500,7 @@ function render(){
   const chips=[['hoje','Hoje',nToday],['cal','Calendário',0],...state.lists.map(l=>['l:'+l,l,0])];
   $('tabs').innerHTML=chips.map(([v,l,n])=>`<button class="tab ${v===view?'on':''}" data-v="${esc(v)}">${esc(l)}${n?`<b>${n}</b>`:''}</button>`).join('')+'<button class="tab add" data-add="1">+ Lista</button>';
   $('form').hidden=selMode;$('selbar').hidden=!selMode;
+  try{localStorage.setItem('tarefas.view',view)}catch(e){} // ao atualizar a página, volta para a mesma aba
 }
 
 /* ---------- eventos principais ---------- */
