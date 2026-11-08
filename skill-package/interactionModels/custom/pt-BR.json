@@ -1,7 +1,7 @@
 {
   "interactionModel": {
     "languageModel": {
-      "invocationName": "meu planner",
+      "invocationName": "bloquinho azul",
       "intents": [
         {
           "name": "AMAZON.CancelIntent",
