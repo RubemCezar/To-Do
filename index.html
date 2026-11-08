@@ -65,6 +65,9 @@ ul{list-style:none;margin:0;padding:0 16px}
 .meta .late{color:var(--high);font-weight:600}
 .lst{display:inline-flex;align-items:center;gap:5px}
 .lst i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.more{display:flex;align-items:center;gap:8px;width:calc(100% - 32px);margin:14px 16px 0;border:0;background:none;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em;font-weight:600;padding:8px 4px;cursor:pointer;text-align:left}
+.more b{font-size:12px;background:var(--accent-soft);color:var(--accent);border-radius:99px;padding:0 7px;letter-spacing:0}
+.more i{font-style:normal;margin-left:auto}
 .donebtn{display:block;margin:14px auto 0;border:0;background:none;color:var(--muted);font-size:14px;padding:8px 14px;cursor:pointer}
 .empty{text-align:center;color:var(--muted);padding:56px 24px}
 .empty big{display:block;font-size:40px;margin-bottom:8px}
@@ -246,23 +249,24 @@ function listColor(name){let h=0;for(const c of name)h=(h*31+c.charCodeAt(0))>>>
 /* ---------- estado ---------- */
 const isYmd=s=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&ymd(parseD(s))===s;
 function normalize(s){
-  if(!s||!Array.isArray(s.tasks))s={lists:['Geral'],tasks:[]};
+  if(!s||!Array.isArray(s.tasks))s={lists:[],tasks:[]};
   let lists=Array.isArray(s.lists)?s.lists.map(l=>String(l).trim().slice(0,30)).filter(Boolean):[];
-  lists=[...new Set(lists)];if(!lists.length)lists=['Geral'];
+  lists=[...new Set(lists)];
+  if(!(s.settings&&s.settings.v2))lists=lists.filter(l=>l!=='Geral'); // "Geral" deixou de existir: tarefas sem lista
   const seen=new Set();
   const tasks=s.tasks.filter(t=>t&&typeof t==='object').map(t=>{
     let id=/^[\w-]{1,40}$/.test(String(t.id||''))?String(t.id):uid();
     while(seen.has(id))id=uid();seen.add(id);
     const rm=String(t.remind==null?'':t.remind);
     return {id,title:String(t.title||''),done:!!t.done,prio:PW[t.prio]!==undefined?t.prio:'media',
-      date:isYmd(t.date)?t.date:'',list:lists.includes(t.list)?t.list:lists[0],notes:String(t.notes||''),
+      date:isYmd(t.date)?t.date:'',list:lists.includes(t.list)?t.list:'',notes:String(t.notes||''),
       subs:Array.isArray(t.subs)?t.subs.filter(x=>x&&typeof x==='object').map(x=>({t:String(x.t||''),done:!!x.done})):[],
       repeat:REP[t.repeat]?t.repeat:'',anchor:Math.min(31,Math.max(0,Math.floor(+t.anchor)||0)),
       doneAt:isYmd(t.doneAt)?t.doneAt:'',created:+t.created||0,
       time:/^\d{2}:\d{2}$/.test(t.time||'')?t.time:'',remind:['','0','10','60','1440'].includes(rm)?rm:'',
       notified:String(t.notified||''),src:String(t.src||'').slice(0,80)};
   });
-  return {lists,tasks,settings:{notify:!!(s.settings&&s.settings.notify)}};
+  return {lists,tasks,settings:{notify:!!(s.settings&&s.settings.notify),v2:true}};
 }
 let state;
 try{
@@ -281,6 +285,7 @@ window.addEventListener('storage',e=>{ // outra janela/aba do app mexeu nos dado
   try{state=normalize(JSON.parse(e.newValue));render()}catch(_){}
 });
 let view='hoje',showDone=false,searchOn=false,justId=null,draft=null,editId=null,nameMode='new';
+let showSoon=false,showNoDate=false;
 let selMode=false,selIds=new Set(),openLi=null,gest=null,suppress=0,lpPending=false; // seleção em massa e deslizar para excluir
 const resetSel=()=>{selMode=false;selIds=new Set()};
 let calSel=today(),calMonth=new Date(new Date().getFullYear(),new Date().getMonth(),1);
@@ -398,7 +403,7 @@ function rowHTML(t){
   return `<li class="task ${t.done?'done':''} ${justId===t.id?'just':''} ${selIds.has(t.id)?'sel':''}" data-id="${t.id}"><div class="rowin">
     <button class="chk p-${t.prio}" data-a="toggle" aria-label="Concluir"></button>
     <div class="body" data-a="open"><div class="t">${esc(t.title)}</div>
-    <div class="meta"><span class="lst"><i style="background:${listColor(t.list)}"></i>${esc(t.list)}</span>
+    <div class="meta">${t.list?`<span class="lst"><i style="background:${listColor(t.list)}"></i>${esc(t.list)}</span>`:''}
     ${t.date?`<span class="${late?'late':''}">${label(t.date)}${t.time?' · '+t.time:''}</span>`:''}
     ${t.time&&t.remind!==''?'<span title="Lembrete">🔔</span>':''}
     ${t.repeat?'<span title="Repete">↻</span>':''}
@@ -444,12 +449,6 @@ function render(){
     title='Calendário';
     const s=parseD(calSel).toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
     sub=s.charAt(0).toUpperCase()+s.slice(1);
-  }else if(view==='proximas'){
-    open=all.filter(t=>!t.done&&t.date&&t.date>td);done=[];
-    title='Em breve';sub=open.length+(open.length===1?' tarefa agendada':' tarefas agendadas');
-  }else if(view==='todas'){
-    open=all.filter(t=>!t.done);done=all.filter(t=>t.done);
-    title='Todas';sub=open.length+(open.length===1?' pendente':' pendentes');
   }else{
     const l=view.slice(2);
     open=all.filter(t=>!t.done&&t.list===l);done=all.filter(t=>t.done&&t.list===l);
@@ -470,14 +469,16 @@ function render(){
   }else if(view==='hoje'){
     html+=section('Atrasadas',open.filter(t=>t.date<td).sort(byDate),'late');
     html+=section('Hoje',open.filter(t=>t.date===td).sort(byTime));
+    const nodate=all.filter(t=>!t.done&&!t.date).sort(byPrio),soon=all.filter(t=>!t.done&&t.date>td).sort(byDate);
+    const more=(k,l,n,on)=>n?`<button class="more" data-a="more" data-k="${k}">${l}<b>${n}</b><i>${on?'▾':'▸'}</i></button>`:'';
+    html+=more('nodate','Sem data',nodate.length,showNoDate)+(showNoDate&&nodate.length?`<ul>${nodate.map(rowHTML).join('')}</ul>`:'');
+    html+=more('soon','Em breve',soon.length,showSoon);
+    if(showSoon)for(const d of [...new Set(soon.map(t=>t.date))]){
+      const dt=parseD(d).toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'});
+      html+=section((diffDays(d)===1?'Amanhã · ':'')+dt.replace(/\./g,''),soon.filter(t=>t.date===d).sort(byTime));
+    }
   }else if(view==='cal'){
     html+=calHTML(td)+section('Tarefas do dia',open.sort(byTime));
-  }else if(view==='proximas'){
-    const days=[...new Set(open.map(t=>t.date))].sort();
-    for(const d of days){
-      const dt=parseD(d).toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'});
-      html+=section((diffDays(d)===1?'Amanhã · ':'')+dt.replace(/\./g,''),open.filter(t=>t.date===d).sort(byTime));
-    }
   }else{
     html+=section('Atrasadas',open.filter(t=>t.date&&t.date<td).sort(byDate),'late');
     html+=section('Hoje',open.filter(t=>t.date===td).sort(byTime));
@@ -489,14 +490,14 @@ function render(){
     if(showDone)html+=`<ul style="margin-top:8px">${done.sort((a,b)=>(b.doneAt||'').localeCompare(a.doneAt||'')).map(rowHTML).join('')}</ul>`;
   }
   if(!open.length&&!(showDone&&done.length)){
-    const msg=searching?['🔍','Nada encontrado.']:view==='hoje'?(done.length?['🎉','Tudo feito por hoje!']:['✨','Dia livre. Nada para hoje.']):view==='cal'?['🗓️','Nada neste dia.']:view==='proximas'?['🗓️','Nada agendado por enquanto.']:['✨','Nada por aqui. Adicione sua primeira tarefa.'];
+    const msg=searching?['🔍','Nada encontrado.']:view==='hoje'?(done.length?['🎉','Tudo feito por hoje!']:['✨','Dia livre. Nada para hoje.']):view==='cal'?['🗓️','Nada neste dia.']:['✨','Nada por aqui. Adicione sua primeira tarefa.'];
     const em=`<div class="empty"><big>${msg[0]}</big>${msg[1]}</div>`;
     html=(view==='cal'&&!searching)?html+em:em+html;
   }
   $('content').innerHTML=html;
 
   const nToday=all.filter(t=>!t.done&&t.date&&t.date<=td).length;
-  const chips=[['hoje','Hoje',nToday],['proximas','Em breve',0],['cal','Calendário',0],['todas','Todas',0],...state.lists.map(l=>['l:'+l,l,0])];
+  const chips=[['hoje','Hoje',nToday],['cal','Calendário',0],...state.lists.map(l=>['l:'+l,l,0])];
   $('tabs').innerHTML=chips.map(([v,l,n])=>`<button class="tab ${v===view?'on':''}" data-v="${esc(v)}">${esc(l)}${n?`<b>${n}</b>`:''}</button>`).join('')+'<button class="tab add" data-add="1">+ Lista</button>';
   $('form').hidden=selMode;$('selbar').hidden=!selMode;
 }
@@ -512,6 +513,7 @@ $('content').onclick=e=>{
   if(nv){resetSel();calMonth=new Date(calMonth.getFullYear(),calMonth.getMonth()+(+nv.dataset.cal),1);render();return}
   const b=e.target.closest('[data-a]');if(!b)return;
   if(b.dataset.a==='showdone'){resetSel();showDone=!showDone;render();return}
+  if(b.dataset.a==='more'){resetSel();if(b.dataset.k==='soon')showSoon=!showSoon;else showNoDate=!showNoDate;render();return}
   const li=b.closest('li');if(!li)return;
   if(b.dataset.a==='swdel'){openLi=null;removeTask(li.dataset.id);return}
   if(b.dataset.a==='toggle')toggle(li.dataset.id);else openSheet(li.dataset.id);
@@ -589,10 +591,10 @@ $('form').onsubmit=e=>{
   e.preventDefault();
   const raw=$('newTask').value.trim();if(!raw)return;
   const p=parseQuick(raw);
-  let date=p.date||(view==='hoje'?today():view==='cal'?calSel:view==='proximas'?ymd(addDays(new Date(),1)):'');
+  let date=p.date||(view==='hoje'?today():view==='cal'?calSel:'');
   if((p.repeat||p.time)&&!date)date=today();
   state.tasks.push({id:uid(),title:p.title,done:false,prio:p.prio||'media',date,
-    list:p.list||(view.startsWith('l:')?view.slice(2):state.lists[0]),notes:'',subs:[],repeat:p.repeat||'',doneAt:'',created:Date.now(),time:p.time||'',remind:p.time?'0':'',notified:''});
+    list:p.list||(view.startsWith('l:')?view.slice(2):''),notes:'',subs:[],repeat:p.repeat||'',doneAt:'',created:Date.now(),time:p.time||'',remind:p.time?'0':'',notified:''});
   $('newTask').value='';$('newTask').oninput();save();render();buzz();
 };
 
@@ -605,7 +607,7 @@ function openSheet(id){
   const t=get(id);if(!t)return;
   editId=id;draft=JSON.parse(JSON.stringify(t));
   $('eTitle').value=t.title;$('eNotes').value=t.notes;$('eDate').value=t.date;$('eRepeat').value=t.repeat;$('eTime').value=t.time;$('eRemind').value=t.remind;
-  $('eList').innerHTML=state.lists.map(l=>`<option ${l===t.list?'selected':''}>${esc(l)}</option>`).join('');
+  $('eList').innerHTML='<option value="">Sem lista</option>'+state.lists.map(l=>`<option ${l===t.list?'selected':''}>${esc(l)}</option>`).join('');
   $('newSub').value='';drawSubs();drawSeg();$('sheet').showModal();
 }
 $('eTime').onchange=()=>{if($('eTime').value&&$('eRemind').value==='')$('eRemind').value='0'};
@@ -647,7 +649,7 @@ for(const id of ['sheet','nameDlg','menuDlg','alexaDlg'])$(id).addEventListener(
 $('nCancel').onclick=()=>$('nameDlg').close();
 $('nameForm').addEventListener('submit',()=>{
   const n=$('nName').value.trim();
-  if(!n||['todas','hoje','em breve'].includes(n.toLowerCase()))return;
+  if(!n||['todas','hoje','em breve','calendário','calendario','sem lista'].includes(n.toLowerCase()))return;
   if(nameMode==='new'){
     if(state.lists.includes(n)){view='l:'+n}else{state.lists.push(n);view='l:'+n}
   }else{
@@ -662,16 +664,16 @@ $('nameForm').addEventListener('submit',()=>{
 /* ---------- menu, backup ---------- */
 $('btnMenu').onclick=()=>{
   const isList=view.startsWith('l:');
-  $('mRename').hidden=!isList;$('mDelList').hidden=!(isList&&state.lists.length>1);
+  $('mRename').hidden=!isList;$('mDelList').hidden=!isList;
   $('mNotify').textContent=state.settings.notify?'Desativar notificações':'Ativar notificações';
   $('mAlexa').textContent=alexa?'Alexa conectada ✓ (desconectar)':'Conectar Alexa';
   $('menuDlg').showModal();
 };
 $('mRename').onclick=()=>{$('menuDlg').close();nameMode='rename';$('nameTitle').textContent='Renomear lista';$('nName').value=view.slice(2);$('nameDlg').showModal()};
 $('mDelList').onclick=()=>{
-  const l=view.slice(2),dest=state.lists.find(x=>x!==l);
-  if(!confirm(`Excluir a lista "${l}"? As tarefas dela serão movidas para "${dest}".`))return;
-  state.tasks.forEach(t=>{if(t.list===l)t.list=dest});
+  const l=view.slice(2);
+  if(!confirm(`Excluir a lista "${l}"? As tarefas dela não serão apagadas: ficam sem lista.`))return;
+  state.tasks.forEach(t=>{if(t.list===l)t.list=''});
   state.lists=state.lists.filter(x=>x!==l);view='hoje';save();render();$('menuDlg').close();
 };
 $('mClear').onclick=()=>{
@@ -690,7 +692,7 @@ function taskFromText(text,src){
   const p=parseQuick(text);let date=p.date||'';
   if((p.repeat||p.time)&&!date)date=today();
   const title=p.title.charAt(0).toUpperCase()+p.title.slice(1);
-  return {id:uid(),title,done:false,prio:p.prio||'media',date,list:p.list||state.lists[0],notes:'',subs:[],
+  return {id:uid(),title,done:false,prio:p.prio||'media',date,list:p.list||'',notes:'',subs:[],
     repeat:p.repeat||'',doneAt:'',created:Date.now(),time:p.time||'',remind:p.time?'0':'',notified:'',src:src||''};
 }
 function decodeCode(c){
