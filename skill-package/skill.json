@@ -5,9 +5,9 @@
         "pt-BR": {
           "summary": "Diga o que você precisa fazer e a tarefa vai para o seu app.",
           "examplePhrases": [
-            "Alexa, abra minha lista",
-            "Alexa, peça à minha lista para adicionar comprar pão",
-            "Alexa, abra minha lista e anote ligar para o dentista amanhã"
+            "Alexa, abra o planner",
+            "Alexa, peça ao planner para adicionar comprar pão",
+            "Alexa, abra o planner e anote ligar para o dentista amanhã"
           ],
           "name": "Minha Lista",
           "description": "Diga o que você precisa fazer e a tarefa é enviada para o seu app de lista de tarefas, com data, horário e prioridade se você falar."
