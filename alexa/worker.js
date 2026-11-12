@@ -38,8 +38,79 @@ async function sameSecret(a, b) {
   return d === 0;
 }
 
+
+// ---------- MCP (Alexa+) ----------
+// Servidor MCP mínimo (Streamable HTTP, JSON-RPC 2.0) com uma ferramenta: add_task.
+// A Alexa+ não manda cabeçalho de autorização configurável, então a chave vai no caminho: POST /mcp/<APP_KEY>
+const MCP_TOOL = {
+  name: 'add_task',
+  description: 'Adiciona uma tarefa ou item à lista de tarefas pessoal do usuário (app Pendências). ' +
+    'Use quando o usuário pedir para anotar, adicionar ou incluir algo que precisa fazer, lembrar ou comprar. ' +
+    'Não use para lembretes com alarme nem para a lista de compras nativa da Alexa.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      title: { type: 'string', description: 'O que fazer, curto. Ex.: "comprar pão", "ligar para o dentista".' },
+      list: { type: 'string', description: 'Nome da lista, se o usuário citar uma. Ex.: "Compras" (também vale "mercado").' },
+      when: { type: 'string', description: 'Quando, se citado, em português. Ex.: "amanhã", "sexta às 14h", "todo dia".' },
+    },
+    required: ['title'],
+  },
+};
+
+function rpcResult(id, result) { return { jsonrpc: '2.0', id, result }; }
+function rpcError(id, code, message) { return { jsonrpc: '2.0', id, error: { code, message } }; }
+
+async function mcpCall(msg, env) {
+  const { id, method, params } = msg || {};
+  if (method === 'initialize') {
+    const v = (params && params.protocolVersion) || '2025-11-25';
+    return rpcResult(id, { protocolVersion: v, capabilities: { tools: { listChanged: false } },
+      serverInfo: { name: 'pendencias', version: '1.0.0' } });
+  }
+  if (method === 'ping') return rpcResult(id, {});
+  if (method === 'tools/list') return rpcResult(id, { tools: [MCP_TOOL] });
+  if (method === 'tools/call') {
+    if (!params || params.name !== 'add_task') return rpcError(id, -32602, 'ferramenta desconhecida');
+    const a = params.arguments || {};
+    const title = String(a.title || '').replace(/\s+/g, ' ').trim();
+    const list = String(a.list || '').replace(/\s+/g, ' ').trim();
+    const when = String(a.when || '').replace(/\s+/g, ' ').trim();
+    if (!title) return rpcResult(id, { isError: true, content: [{ type: 'text', text: 'Faltou dizer o que anotar.' }] });
+    const text = [title, when, list ? 'na lista ' + list : ''].filter(Boolean).join(' ').slice(0, MAX_TEXT);
+    const n = await env.DB.prepare('SELECT COUNT(*) AS n FROM inbox').first('n');
+    if (n >= MAX_ITEMS) return rpcResult(id, { isError: true, content: [{ type: 'text', text: 'A caixa de entrada está cheia. Abra o app para sincronizar.' }] });
+    await env.DB.prepare('INSERT INTO inbox (id, text, at) VALUES (?, ?, ?)').bind(crypto.randomUUID(), text, Date.now()).run();
+    return rpcResult(id, { content: [{ type: 'text', text: 'Anotado: ' + text }] });
+  }
+  return rpcError(id, -32601, 'método não suportado');
+}
+
+async function handleMcp(req, env, key) {
+  const h = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' };
+  if (!env.APP_KEY || env.APP_KEY.length < 16 || !(await sameSecret(key, env.APP_KEY))) {
+    return new Response(JSON.stringify({ error: 'não autorizado' }), { status: 401, headers: h });
+  }
+  if (req.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } });
+  let body;
+  try { body = await req.json(); } catch (e) { return new Response(JSON.stringify(rpcError(null, -32700, 'JSON inválido')), { status: 400, headers: h }); }
+  try {
+    if (Array.isArray(body)) {
+      const out = [];
+      for (const m of body) { if (m && m.id !== undefined) out.push(await mcpCall(m, env)); }
+      return out.length ? new Response(JSON.stringify(out), { status: 200, headers: h }) : new Response(null, { status: 202 });
+    }
+    if (!body || body.id === undefined) return new Response(null, { status: 202 }); // notificações (ex.: notifications/initialized)
+    return new Response(JSON.stringify(await mcpCall(body, env)), { status: 200, headers: h });
+  } catch (e) {
+    return new Response(JSON.stringify(rpcError(body && body.id, -32603, 'erro interno')), { status: 200, headers: h });
+  }
+}
+
 export default {
   async fetch(req, env) {
+    const mm = /^\/mcp\/([^/]+)\/?$/.exec(new URL(req.url).pathname);
+    if (mm) return handleMcp(req, env, decodeURIComponent(mm[1]));
     const cors = corsHeaders(req);
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
 
