@@ -47,6 +47,9 @@ h1{margin:0;font-size:30px;letter-spacing:-.5px;line-height:1.15;overflow-wrap:a
 .stab b{font-size:11px;background:var(--accent-soft);color:var(--accent);border-radius:99px;padding:0 6px}
 .stab.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
 .stab.add{background:none;border:1px dashed var(--line)}
+.swatches{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin:16px 0}
+.sw{aspect-ratio:1;border-radius:50%;border:3px solid transparent;cursor:pointer;padding:0}
+.sw.on{border-color:var(--text);box-shadow:0 0 0 2px var(--card) inset}
 h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:18px 20px 8px;display:flex;gap:8px;font-weight:600}
 h2 span{font-weight:400}
 h2.late{color:var(--high)}
@@ -216,9 +219,18 @@ dialog::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(2px)}
   </div>
 </dialog>
 
+<dialog id="colorDlg">
+  <div class="sh">
+    <strong>Cor da lista</strong>
+    <div class="swatches" id="swatches"></div>
+    <div class="acts"><button type="button" id="cDefault">Automática</button><button type="button" class="pri" id="cClose">Fechar</button></div>
+  </div>
+</dialog>
+
 <dialog id="menuDlg">
   <div class="sh menu">
     <strong>Mais opções</strong>
+    <button id="mColor" hidden>Cor da lista</button>
     <button id="mRename" hidden>Renomear esta lista</button>
     <button id="mDelList" class="dng" hidden>Excluir esta lista</button>
     <button id="mSubRename" hidden>Renomear esta sublista</button>
@@ -250,6 +262,7 @@ const MAP={'á':'a','à':'a','â':'a','ã':'a','ä':'a','é':'e','ê':'e','è':'
 const norm=s=>s.toLowerCase().replace(/[áàâãäéêèíîóôõòúûüç]/g,c=>MAP[c]);
 const PW={alta:0,media:1,baixa:2};
 const PALETTE=['#6366f1','#10b981','#f59e0b','#ef4444','#06b6d4','#d946ef','#84cc16','#f97316'];
+const PICK=[...PALETTE,'#ec4899','#14b8a6','#8b5cf6','#0ea5e9','#eab308','#64748b']; // cores que dá para escolher
 const DOW=['domingo','segunda','terca','quarta','quinta','sexta','sabado'];
 const REP={daily:'Todo dia',weekly:'Toda semana',monthly:'Todo mês'};
 const buzz=()=>{try{navigator.vibrate&&navigator.vibrate(12)}catch(e){}};
@@ -260,7 +273,7 @@ function label(s){
   if(n>1&&n<7)return parseD(s).toLocaleDateString('pt-BR',{weekday:'short'}).replace('.','');
   const [,m,d]=s.split('-'); return d+'/'+m;
 }
-function listColor(name){let h=0;for(const c of name)h=(h*31+c.charCodeAt(0))>>>0;return PALETTE[h%PALETTE.length]}
+function listColor(name){const c=state&&state.colors&&state.colors[name];if(c)return c;let h=0;for(const c of name)h=(h*31+c.charCodeAt(0))>>>0;return PALETTE[h%PALETTE.length]}
 
 /* ---------- estado ---------- */
 const isYmd=s=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&ymd(parseD(s))===s;
@@ -275,6 +288,9 @@ function normalize(s){
     const a=Array.isArray(rawSub[l])?[...new Set(rawSub[l].map(x=>String(x).trim().slice(0,30)).filter(x=>x&&x!=='__none'))]:[];
     if(a.length)sublists[l]=a;
   }
+  const rawCol=(s.colors&&typeof s.colors==='object'&&!Array.isArray(s.colors))?s.colors:{};
+  const colors=Object.create(null);
+  for(const l of lists){const c=String(rawCol[l]||'').toLowerCase();if(PICK.includes(c))colors[l]=c}
   const seen=new Set();
   const tasks=s.tasks.filter(t=>t&&typeof t==='object').map(t=>{
     let id=/^[\w-]{1,40}$/.test(String(t.id||''))?String(t.id):uid();
@@ -289,7 +305,7 @@ function normalize(s){
       time:/^\d{2}:\d{2}$/.test(t.time||'')?t.time:'',remind:['','0','10','60','1440'].includes(rm)?rm:'',
       notified:String(t.notified||''),src:String(t.src||'').slice(0,80)};
   });
-  return {lists,sublists,tasks,settings:{notify:!!(s.settings&&s.settings.notify),v2:true}};
+  return {lists,sublists,colors,tasks,settings:{notify:!!(s.settings&&s.settings.notify),v2:true}};
 }
 let state;
 try{
@@ -763,7 +779,7 @@ $('eform').addEventListener('submit',()=>{
 });
 $('eCancel').onclick=()=>$('sheet').close();
 $('eDel').onclick=()=>{$('sheet').close();removeTask(editId)};
-for(const id of ['sheet','nameDlg','menuDlg','alexaDlg'])$(id).addEventListener('click',e=>{if(e.target===$(id))$(id).close()});
+for(const id of ['sheet','nameDlg','menuDlg','alexaDlg','colorDlg'])$(id).addEventListener('click',e=>{if(e.target===$(id))$(id).close()});
 
 /* ---------- listas ---------- */
 $('nCancel').onclick=()=>$('nameDlg').close();
@@ -784,6 +800,7 @@ $('nameForm').addEventListener('submit',()=>{
     if(n!==old&&!state.lists.includes(n)){
       state.lists=state.lists.map(l=>l===old?n:l);state.tasks.forEach(t=>{if(t.list===old)t.list=n});
       if(state.sublists[old]){state.sublists[n]=state.sublists[old];delete state.sublists[old]}
+      if(state.colors[old]){state.colors[n]=state.colors[old];delete state.colors[old]}
       view='l:'+n;
     }
   }
@@ -793,13 +810,24 @@ $('nameForm').addEventListener('submit',()=>{
 /* ---------- menu, backup ---------- */
 $('btnMenu').onclick=()=>{
   const isList=view.startsWith('l:');
-  $('mRename').hidden=!isList;$('mDelList').hidden=!isList;
+  $('mRename').hidden=!isList;$('mDelList').hidden=!isList;$('mColor').hidden=!isList;
   const sg=isList&&subSel&&subSel!=='__none';$('mSubRename').hidden=!sg;$('mSubDel').hidden=!sg;
   $('mNotify').textContent=state.settings.notify?'Desativar notificações':'Ativar notificações';
   $('mAlexa').textContent=alexa?'Alexa conectada ✓ (desconectar)':'Conectar Alexa';
   $('menuDlg').showModal();
 };
 $('mRename').onclick=()=>{$('menuDlg').close();nameMode='rename';$('nameTitle').textContent='Renomear lista';$('nName').value=view.slice(2);$('nameDlg').showModal()};
+function drawSwatches(){
+  const l=view.slice(2),cur=listColor(l);
+  $('swatches').innerHTML=PICK.map(c=>`<button type="button" class="sw ${c===cur?'on':''}" data-c="${c}" style="background:${c}" aria-label="Cor ${c}"></button>`).join('');
+}
+$('mColor').onclick=()=>{if(!view.startsWith('l:'))return;$('menuDlg').close();drawSwatches();$('colorDlg').showModal()};
+$('swatches').onclick=e=>{
+  const b=e.target.closest('[data-c]');if(!b||!view.startsWith('l:')||!PICK.includes(b.dataset.c))return;
+  state.colors[view.slice(2)]=b.dataset.c;save();render();drawSwatches();
+};
+$('cDefault').onclick=()=>{if(!view.startsWith('l:'))return;delete state.colors[view.slice(2)];save();render();drawSwatches()};
+$('cClose').onclick=()=>$('colorDlg').close();
 $('mSubRename').onclick=()=>{$('menuDlg').close();nameMode='subrename';$('nameTitle').textContent='Renomear sublista';$('nName').value=subSel;$('nameDlg').showModal()};
 $('mSubDel').onclick=()=>{
   const l=view.slice(2),g=subSel;
@@ -812,7 +840,7 @@ $('mDelList').onclick=()=>{
   const l=view.slice(2);
   if(!confirm(`Excluir a lista "${l}"? As tarefas dela não serão apagadas: ficam sem lista.`))return;
   state.tasks.forEach(t=>{if(t.list===l){t.list='';t.group=''}});
-  delete state.sublists[l];state.lists=state.lists.filter(x=>x!==l);view='hoje';save();render();$('menuDlg').close();
+  delete state.sublists[l];delete state.colors[l];state.lists=state.lists.filter(x=>x!==l);view='hoje';save();render();$('menuDlg').close();
 };
 $('mClear').onclick=()=>{
   const n=state.tasks.filter(t=>t.done).length;
