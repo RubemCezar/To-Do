@@ -801,7 +801,7 @@ function openSheet(id){
   $('eTitle').value=t.title;$('eNotes').value=t.notes;$('eDate').value=t.date;$('eRepeat').value=t.repeat;$('eTime').value=t.time;$('eRemind').value=t.remind;
   $('eList').innerHTML='<option value="">Sem lista</option>'+state.lists.map(l=>`<option ${l===t.list?'selected':''}>${esc(l)}</option>`).join('');
   fillGroup(t.group);
-  $('newSub').value='';drawSubs();drawSeg();$('sheet').showModal();
+  $('newSub').value='';drawSubs();drawSeg();$('sheet').showModal();document.activeElement&&document.activeElement.blur();
 }
 function fillGroup(cur){
   const gs=subsOf($('eList').value);
