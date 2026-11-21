@@ -40,6 +40,13 @@ h1{margin:0;font-size:30px;letter-spacing:-.5px;line-height:1.15;overflow-wrap:a
 .tab.drop-l{box-shadow:-5px 0 0 var(--accent),var(--shadow)}
 .tab.drop-r{box-shadow:5px 0 0 var(--accent),var(--shadow)}
 .tabs.dragging{cursor:grabbing}
+.subtabs{display:flex;gap:6px;padding:4px 20px 6px;overflow-x:auto;scrollbar-width:none}
+.subtabs::-webkit-scrollbar{display:none}
+.subtabs[hidden]{display:none}
+.stab{flex:none;border:0;background:var(--card);color:var(--muted);padding:5px 12px;border-radius:99px;font-size:13px;cursor:pointer;display:flex;gap:5px;align-items:center}
+.stab b{font-size:11px;background:var(--accent-soft);color:var(--accent);border-radius:99px;padding:0 6px}
+.stab.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.stab.add{background:none;border:1px dashed var(--line)}
 h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:18px 20px 8px;display:flex;gap:8px;font-weight:600}
 h2 span{font-weight:400}
 h2.late{color:var(--high)}
@@ -137,6 +144,7 @@ dialog::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(2px)}
 <input id="q" type="search" placeholder="Buscar tarefas…" autocomplete="off">
 <div class="prog" id="prog" hidden><i id="progBar"></i></div>
 <nav class="tabs" id="tabs"></nav>
+<div class="subtabs" id="subtabs" hidden></div>
 <main id="content"></main>
 
 <div id="toast"><span id="toastMsg"></span><button id="toastUndo">Desfazer</button></div>
@@ -177,6 +185,7 @@ dialog::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(2px)}
         <select id="eRepeat"><option value="">Não repete</option><option value="daily">Todo dia</option><option value="weekly">Toda semana</option><option value="monthly">Todo mês</option></select></div>
       <div><label for="eList">Lista</label><select id="eList"></select></div>
     </div>
+    <div id="eGroupWrap" hidden><label for="eGroup">Sublista</label><select id="eGroup"></select></div>
     <label>Subtarefas</label>
     <ul class="subs" id="subs"></ul>
     <input id="newSub" placeholder="+ Adicionar subtarefa" enterkeyhint="done">
@@ -212,6 +221,8 @@ dialog::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(2px)}
     <strong>Mais opções</strong>
     <button id="mRename" hidden>Renomear esta lista</button>
     <button id="mDelList" class="dng" hidden>Excluir esta lista</button>
+    <button id="mSubRename" hidden>Renomear esta sublista</button>
+    <button id="mSubDel" class="dng" hidden>Excluir esta sublista</button>
     <button id="mAlexa">Conectar Alexa</button>
     <button id="mNotify">Ativar notificações</button>
     <small style="margin:-6px 0 6px">Os lembretes aparecem enquanto o app está aberto (ou quando você abrir). Para avisar com o app fechado seria preciso um servidor de notificações.</small>
@@ -258,20 +269,27 @@ function normalize(s){
   let lists=Array.isArray(s.lists)?s.lists.map(l=>String(l).trim().slice(0,30)).filter(Boolean):[];
   lists=[...new Set(lists)];
   if(!(s.settings&&s.settings.v2))lists=lists.filter(l=>l!=='Geral'); // "Geral" deixou de existir: tarefas sem lista
+  const rawSub=(s.sublists&&typeof s.sublists==='object'&&!Array.isArray(s.sublists))?s.sublists:{};
+  const sublists=Object.create(null);
+  for(const l of lists){
+    const a=Array.isArray(rawSub[l])?[...new Set(rawSub[l].map(x=>String(x).trim().slice(0,30)).filter(x=>x&&x!=='__none'))]:[];
+    if(a.length)sublists[l]=a;
+  }
   const seen=new Set();
   const tasks=s.tasks.filter(t=>t&&typeof t==='object').map(t=>{
     let id=/^[\w-]{1,40}$/.test(String(t.id||''))?String(t.id):uid();
     while(seen.has(id))id=uid();seen.add(id);
     const rm=String(t.remind==null?'':t.remind);
     return {id,title:String(t.title||''),done:!!t.done,prio:PW[t.prio]!==undefined?t.prio:'media',
-      date:isYmd(t.date)?t.date:'',list:lists.includes(t.list)?t.list:'',notes:String(t.notes||''),
+      date:isYmd(t.date)?t.date:'',list:lists.includes(t.list)?t.list:'',
+      group:lists.includes(t.list)&&(sublists[t.list]||[]).includes(String(t.group||''))?String(t.group):'',notes:String(t.notes||''),
       subs:Array.isArray(t.subs)?t.subs.filter(x=>x&&typeof x==='object').map(x=>({t:String(x.t||''),done:!!x.done})):[],
       repeat:REP[t.repeat]?t.repeat:'',anchor:Math.min(31,Math.max(0,Math.floor(+t.anchor)||0)),
       doneAt:isYmd(t.doneAt)?t.doneAt:'',created:+t.created||0,
       time:/^\d{2}:\d{2}$/.test(t.time||'')?t.time:'',remind:['','0','10','60','1440'].includes(rm)?rm:'',
       notified:String(t.notified||''),src:String(t.src||'').slice(0,80)};
   });
-  return {lists,tasks,settings:{notify:!!(s.settings&&s.settings.notify),v2:true}};
+  return {lists,sublists,tasks,settings:{notify:!!(s.settings&&s.settings.notify),v2:true}};
 }
 let state;
 try{
@@ -295,6 +313,8 @@ let selMode=false,selIds=new Set(),openLi=null,gest=null,suppress=0,lpPending=fa
 const resetSel=()=>{selMode=false;selIds=new Set()};
 let calSel=today(),calMonth=new Date(new Date().getFullYear(),new Date().getMonth(),1);
 const get=id=>state.tasks.find(t=>t.id===id);
+const subsOf=l=>(state.sublists&&state.sublists[l])||[];
+let subSel=''; // sublista aberta dentro da lista ('' = todas, '__none' = sem sublista)
 
 /* ---------- entrada rápida em português ---------- */
 function parseQuick(raw){
@@ -347,9 +367,17 @@ function parseQuick(raw){
     if(!lm2&&AL[norm(l)]){const re2=new RegExp('\\b(?:na|no|em|do|da|para o|para a|pro|pra) (?:'+AL[norm(l)].join('|')+')\\b');lm2=re2.exec(n)} // "no mercado" sem a palavra lista
     if(lm2){out.list=l;cut.push([lm2.index,lm2.index+lm2[0].length]);n=n.slice(0,lm2.index)+'\u0001'.repeat(lm2[0].length)+n.slice(lm2.index+lm2[0].length);break}
   }
-  const lm=/(^|\s)#([a-z0-9_-]+)/.exec(n);
+  const lm=/(^|\s)#([a-z0-9_-]+)(?:\/([a-z0-9_-]+))?/.exec(n);
   if(lm){const found=state.lists.find(l=>norm(l).replace(/\s+/g,'-')===lm[2]);
-    if(found){out.list=found;cut.push([lm.index,lm.index+lm[0].length])}}
+    if(found){out.list=found;cut.push([lm.index,lm.index+lm[0].length]);
+      if(lm[3]){const g=subsOf(found).find(x=>norm(x).replace(/\s+/g,'-')===lm[3]);if(g)out.group=g}}}
+  if(out.list&&!out.group){ // "na sublista roupa"
+    for(const g of [...subsOf(out.list)].sort((a,b)=>b.length-a.length)){
+      const re=new RegExp('\\b(?:na|no|em|para a|para o|pra) (?:minha )?sublista (?:de |da |do )?'+norm(g).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b');
+      const gm=re.exec(n);
+      if(gm){out.group=g;cut.push([gm.index,gm.index+gm[0].length]);break}
+    }
+  }
   let t='';
   for(let i=0;i<raw.length;i++)if(!cut.some(([a,b])=>i>=a&&i<b))t+=raw[i];
   t=t.replace(/\s+/g,' ').trim().replace(/^[,;:-]\s*|\s*[,;:-]$/g,'');
@@ -411,7 +439,7 @@ function rowHTML(t){
   return `<li class="task ${t.done?'done':''} ${justId===t.id?'just':''} ${selIds.has(t.id)?'sel':''}" data-id="${t.id}"><div class="rowin">
     <button class="chk p-${t.prio}" data-a="toggle" aria-label="Concluir"></button>
     <div class="body" data-a="open"><div class="t">${esc(t.title)}</div>
-    <div class="meta">${t.list?`<span class="lst"><i style="background:${listColor(t.list)}"></i>${esc(t.list)}</span>`:''}
+    <div class="meta">${t.list?`<span class="lst"><i style="background:${listColor(t.list)}"></i>${esc(t.list)}${t.group?' · '+esc(t.group):''}</span>`:''}
     ${t.date?`<span class="${late?'late':''}">${label(t.date)}${t.time?' · '+t.time:''}</span>`:''}
     ${t.time&&t.remind!==''?'<span title="Lembrete">🔔</span>':''}
     ${t.repeat?'<span title="Repete">↻</span>':''}
@@ -459,8 +487,10 @@ function render(){
     sub=s.charAt(0).toUpperCase()+s.slice(1);
   }else{
     const l=view.slice(2);
-    open=all.filter(t=>!t.done&&t.list===l);done=all.filter(t=>t.done&&t.list===l);
-    title=l;sub=open.length+(open.length===1?' pendente':' pendentes');
+    if(subSel&&subSel!=='__none'&&!subsOf(l).includes(subSel))subSel='';
+    const inSub=t=>!subSel?true:subSel==='__none'?!t.group:t.group===subSel;
+    open=all.filter(t=>!t.done&&t.list===l&&inSub(t));done=all.filter(t=>t.done&&t.list===l&&inSub(t));
+    title=l;sub=(subSel==='__none'?'Sem sublista · ':subSel?subSel+' · ':'')+open.length+(open.length===1?' pendente':' pendentes');
   }
   if(selMode){title=selIds.size+(selIds.size===1?' selecionada':' selecionadas');sub='Toque nas tarefas para marcar ou desmarcar'}
   $('title').textContent=title;$('sub').textContent=sub;
@@ -507,6 +537,13 @@ function render(){
   const nToday=all.filter(t=>!t.done&&t.date&&t.date<=td).length;
   const chips=[['hoje','Hoje',nToday],['cal','Calendário',0],...state.lists.map(l=>['l:'+l,l,0])];
   $('tabs').innerHTML=chips.map(([v,l,n])=>`<button class="tab ${v===view?'on':''}" data-v="${esc(v)}">${esc(l)}${n?`<b>${n}</b>`:''}</button>`).join('')+'<button class="tab add" data-add="1">+ Lista</button>';
+  const stEl=$('subtabs');
+  if(isList&&!searching){
+    const l=view.slice(2),gs=subsOf(l),lo=all.filter(t=>!t.done&&t.list===l),noneN=lo.filter(t=>!t.group).length;
+    const chip=(g,txt,n)=>`<button class="stab ${subSel===g?'on':''}" data-g="${esc(g)}">${esc(txt)}${n?`<b>${n}</b>`:''}</button>`;
+    stEl.innerHTML=chip('','Todas',lo.length)+gs.map(g=>chip(g,g,lo.filter(t=>t.group===g).length)).join('')+(gs.length&&noneN?chip('__none','Sem sublista',noneN):'')+'<button class="stab add" data-gadd="1">+ Sublista</button>';
+    stEl.hidden=false;
+  }else stEl.hidden=true;
   $('form').hidden=selMode;$('selbar').hidden=!selMode;
   try{localStorage.setItem('tarefas.view',view)}catch(e){} // ao atualizar a página, volta para a mesma aba
 }
@@ -579,7 +616,7 @@ $('tabs').onclick=e=>{
   if(dragSuppress){dragSuppress=false;return}
   const b=e.target.closest('.tab');if(!b)return;
   if(b.dataset.add){nameMode='new';$('nameTitle').textContent='Nova lista';$('nName').value='';$('nameDlg').showModal();setTimeout(()=>$('nName').focus(),50);return}
-  resetSel();view=b.dataset.v;showDone=false;render();
+  resetSel();view=b.dataset.v;showDone=false;subSel='';render();
   $('tabs').querySelector('.on')?.scrollIntoView({inline:'center',block:'nearest'});
 };
 /* ---------- reordenar listas: segure uma aba e arraste ---------- */
@@ -640,6 +677,11 @@ window.addEventListener('pointerup',e=>{
   render();
 });
 window.addEventListener('pointercancel',e=>{if(dr&&e.pointerId===dr.pid)dragStop()});
+$('subtabs').onclick=e=>{
+  const b=e.target.closest('.stab');if(!b)return;
+  if(b.dataset.gadd){nameMode='newsub';$('nameTitle').textContent='Nova sublista';$('nName').value='';$('nameDlg').showModal();setTimeout(()=>$('nName').focus(),50);return}
+  resetSel();subSel=b.dataset.g;showDone=false;render();
+};
 $('btnSearch').onclick=()=>{resetSel();searchOn=!searchOn;$('q').classList.toggle('on',searchOn);if(searchOn)$('q').focus();else $('q').value='';render()};
 $('q').oninput=()=>{resetSel();render()};
 
@@ -650,7 +692,7 @@ $('newTask').oninput=()=>{
     if(p.time)chips.push('⏰ '+p.time);
     if(p.repeat)chips.push('↻ '+REP[p.repeat]);
     if(p.prio)chips.push('● '+{alta:'Alta',media:'Média',baixa:'Baixa'}[p.prio]);
-    if(p.list)chips.push('# '+p.list);
+    if(p.list)chips.push('# '+p.list+(p.group?' › '+p.group:''));
   }
   $('prev').innerHTML=chips.map(c=>`<span>${esc(c)}</span>`).join('');
   $('prev').classList.toggle('on',chips.length>0);
@@ -661,8 +703,11 @@ $('form').onsubmit=e=>{
   const p=parseQuick(raw);
   let date=p.date||(view==='hoje'?today():view==='cal'?calSel:'');
   if((p.repeat||p.time)&&!date)date=today();
+  const curList=view.startsWith('l:')?view.slice(2):'',lst=p.list||curList;
+  let grp=p.group||'';
+  if(!grp&&curList&&lst===curList&&subSel&&subSel!=='__none'&&subsOf(curList).includes(subSel))grp=subSel;
   state.tasks.push({id:uid(),title:p.title,done:false,prio:p.prio||'media',date,
-    list:p.list||(view.startsWith('l:')?view.slice(2):''),notes:'',subs:[],repeat:p.repeat||'',doneAt:'',created:Date.now(),time:p.time||'',remind:p.time?'0':'',notified:''});
+    list:lst,group:grp,notes:'',subs:[],repeat:p.repeat||'',doneAt:'',created:Date.now(),time:p.time||'',remind:p.time?'0':'',notified:''});
   $('newTask').value='';$('newTask').oninput();save();render();buzz();
 };
 
@@ -676,8 +721,15 @@ function openSheet(id){
   editId=id;draft=JSON.parse(JSON.stringify(t));
   $('eTitle').value=t.title;$('eNotes').value=t.notes;$('eDate').value=t.date;$('eRepeat').value=t.repeat;$('eTime').value=t.time;$('eRemind').value=t.remind;
   $('eList').innerHTML='<option value="">Sem lista</option>'+state.lists.map(l=>`<option ${l===t.list?'selected':''}>${esc(l)}</option>`).join('');
+  fillGroup(t.group);
   $('newSub').value='';drawSubs();drawSeg();$('sheet').showModal();
 }
+function fillGroup(cur){
+  const gs=subsOf($('eList').value);
+  $('eGroupWrap').hidden=!gs.length;
+  $('eGroup').innerHTML='<option value="">Sem sublista</option>'+gs.map(g=>`<option ${g===cur?'selected':''}>${esc(g)}</option>`).join('');
+}
+$('eList').onchange=()=>fillGroup('');
 $('eTime').onchange=()=>{if($('eTime').value&&$('eRemind').value==='')$('eRemind').value='0'};
 $('prioSeg').onclick=e=>{const b=e.target.closest('[data-p]');if(b){draft.prio=b.dataset.p;drawSeg()}};
 $('dateChips').onclick=e=>{
@@ -701,7 +753,7 @@ $('eform').addEventListener('submit',()=>{
   const v=$('newSub').value.trim();if(v)draft.subs.push({t:v,done:false});
   t.title=$('eTitle').value.trim()||t.title;t.notes=$('eNotes').value.trim();
   const oldKey=t.date+'|'+t.time+'|'+t.remind,oldDate=t.date,oldRepeat=t.repeat;
-  t.date=$('eDate').value;t.prio=draft.prio;t.repeat=$('eRepeat').value;t.list=$('eList').value;
+  t.date=$('eDate').value;t.prio=draft.prio;t.repeat=$('eRepeat').value;t.list=$('eList').value;t.group=subsOf(t.list).includes($('eGroup').value)?$('eGroup').value:'';
   t.time=$('eTime').value;t.remind=t.time?$('eRemind').value:'';
   if((t.repeat||t.time)&&!t.date)t.date=today();
   if(t.date+'|'+t.time+'|'+t.remind!==oldKey)t.notified='';
@@ -717,13 +769,22 @@ for(const id of ['sheet','nameDlg','menuDlg','alexaDlg'])$(id).addEventListener(
 $('nCancel').onclick=()=>$('nameDlg').close();
 $('nameForm').addEventListener('submit',()=>{
   const n=$('nName').value.trim();
+  if(nameMode==='newsub'||nameMode==='subrename'){
+    if(!n||['todas','sem sublista','__none'].includes(n.toLowerCase())||!view.startsWith('l:'))return;
+    const l=view.slice(2),arr=state.sublists[l]||(state.sublists[l]=[]);
+    if(nameMode==='newsub'){if(!arr.includes(n))arr.push(n);subSel=n}
+    else{const old=subSel;if(n!==old&&!arr.includes(n)){state.sublists[l]=arr.map(g=>g===old?n:g);state.tasks.forEach(t=>{if(t.list===l&&t.group===old)t.group=n});subSel=n}}
+    save();render();return;
+  }
   if(!n||['todas','hoje','em breve','calendário','calendario','sem lista'].includes(n.toLowerCase()))return;
   if(nameMode==='new'){
     if(state.lists.includes(n)){view='l:'+n}else{state.lists.push(n);view='l:'+n}
   }else{
     const old=view.slice(2);
     if(n!==old&&!state.lists.includes(n)){
-      state.lists=state.lists.map(l=>l===old?n:l);state.tasks.forEach(t=>{if(t.list===old)t.list=n});view='l:'+n;
+      state.lists=state.lists.map(l=>l===old?n:l);state.tasks.forEach(t=>{if(t.list===old)t.list=n});
+      if(state.sublists[old]){state.sublists[n]=state.sublists[old];delete state.sublists[old]}
+      view='l:'+n;
     }
   }
   save();render();
@@ -733,16 +794,25 @@ $('nameForm').addEventListener('submit',()=>{
 $('btnMenu').onclick=()=>{
   const isList=view.startsWith('l:');
   $('mRename').hidden=!isList;$('mDelList').hidden=!isList;
+  const sg=isList&&subSel&&subSel!=='__none';$('mSubRename').hidden=!sg;$('mSubDel').hidden=!sg;
   $('mNotify').textContent=state.settings.notify?'Desativar notificações':'Ativar notificações';
   $('mAlexa').textContent=alexa?'Alexa conectada ✓ (desconectar)':'Conectar Alexa';
   $('menuDlg').showModal();
 };
 $('mRename').onclick=()=>{$('menuDlg').close();nameMode='rename';$('nameTitle').textContent='Renomear lista';$('nName').value=view.slice(2);$('nameDlg').showModal()};
+$('mSubRename').onclick=()=>{$('menuDlg').close();nameMode='subrename';$('nameTitle').textContent='Renomear sublista';$('nName').value=subSel;$('nameDlg').showModal()};
+$('mSubDel').onclick=()=>{
+  const l=view.slice(2),g=subSel;
+  if(!g||!confirm(`Excluir a sublista "${g}"? As tarefas dela não serão apagadas: continuam na lista "${l}", sem sublista.`))return;
+  state.tasks.forEach(t=>{if(t.list===l&&t.group===g)t.group=''});
+  state.sublists[l]=subsOf(l).filter(x=>x!==g);if(!state.sublists[l].length)delete state.sublists[l];
+  subSel='';save();render();$('menuDlg').close();
+};
 $('mDelList').onclick=()=>{
   const l=view.slice(2);
   if(!confirm(`Excluir a lista "${l}"? As tarefas dela não serão apagadas: ficam sem lista.`))return;
-  state.tasks.forEach(t=>{if(t.list===l)t.list=''});
-  state.lists=state.lists.filter(x=>x!==l);view='hoje';save();render();$('menuDlg').close();
+  state.tasks.forEach(t=>{if(t.list===l){t.list='';t.group=''}});
+  delete state.sublists[l];state.lists=state.lists.filter(x=>x!==l);view='hoje';save();render();$('menuDlg').close();
 };
 $('mClear').onclick=()=>{
   const n=state.tasks.filter(t=>t.done).length;
@@ -760,7 +830,7 @@ function taskFromText(text,src){
   const p=parseQuick(text);let date=p.date||'';
   if((p.repeat||p.time)&&!date)date=today();
   const title=p.title.charAt(0).toUpperCase()+p.title.slice(1);
-  return {id:uid(),title,done:false,prio:p.prio||'media',date,list:p.list||'',notes:'',subs:[],
+  return {id:uid(),title,done:false,prio:p.prio||'media',date,list:p.list||'',group:p.group||'',notes:'',subs:[],
     repeat:p.repeat||'',doneAt:'',created:Date.now(),time:p.time||'',remind:p.time?'0':'',notified:'',src:src||''};
 }
 function decodeCode(c){
