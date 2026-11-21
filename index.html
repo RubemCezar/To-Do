@@ -125,6 +125,7 @@ dialog::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(2px)}
 .seg{display:flex;gap:6px}
 .seg button{flex:1;border-radius:10px;padding:9px}
 .seg button.on{background:var(--accent);color:#fff}
+#aDate button.on{background:var(--accent);color:#fff}
 .seg button[data-p="alta"].on{background:var(--high)}
 .seg button[data-p="media"].on{background:var(--mid)}
 .seg button[data-p="baixa"].on{background:var(--blue)}
@@ -223,6 +224,16 @@ dialog::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(2px)}
       <button type="button" id="eCancel">Cancelar</button>
       <button class="pri" value="ok">Salvar</button>
     </div>
+  </form>
+</dialog>
+
+<dialog id="addDlg">
+  <form method="dialog" id="addForm" class="sh">
+    <strong>Nova tarefa</strong>
+    <input id="aTitle" placeholder="O que precisa fazer?" maxlength="200" required autocomplete="off">
+    <div class="seg" id="aPrio" style="margin-top:14px"><button type="button" data-p="alta">Alta</button><button type="button" data-p="media" class="on">Média</button><button type="button" data-p="baixa">Baixa</button></div>
+    <div class="chips" id="aDate"><button type="button" data-d="hoje">Hoje</button><button type="button" data-d="amanha">Amanhã</button><button type="button" data-d="none" class="on">Sem data</button></div>
+    <div class="acts"><button type="button" id="aCancel">Cancelar</button><button class="pri" value="ok">Adicionar</button></div>
   </form>
 </dialog>
 
@@ -746,9 +757,22 @@ function drawPrio(){
 }
 $('pbtn').onclick=()=>{$('ppop').hidden=!$('ppop').hidden;drawPrio()};
 $('ppop').onclick=e=>{const b=e.target.closest('[data-p]');if(!b)return;newPrio=b.dataset.p;$('ppop').hidden=true;drawPrio();$('newTask').focus()};
+let aP='media',aD='none';
+function drawAdd(){$('aPrio').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.p===aP));$('aDate').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.d===aD))}
+$('aPrio').onclick=e=>{const b=e.target.closest('[data-p]');if(b){aP=b.dataset.p;drawAdd()}};
+$('aDate').onclick=e=>{const b=e.target.closest('[data-d]');if(b){aD=b.dataset.d;drawAdd()}};
+$('aCancel').onclick=()=>$('addDlg').close();
+$('addForm').onsubmit=e=>{e.preventDefault();
+  const raw=$('aTitle').value.trim();if(!raw)return;const p=parseQuick(raw);
+  let date=aD==='hoje'?today():aD==='amanha'?ymd(addDays(new Date(),1)):(p.date||(view==='hoje'?today():view==='cal'?calSel:''));
+  if((p.repeat||p.time)&&!date)date=today();
+  const curList=view.startsWith('l:')?view.slice(2):'',lst=p.list||curList;let grp=p.group||'';
+  if(!grp&&curList&&lst===curList&&subSel&&subSel!=='__none'&&subsOf(curList).includes(subSel))grp=subSel;
+  state.tasks.push({id:uid(),title:p.title,done:false,prio:p.prio||aP,date,list:lst,group:grp,notes:'',subs:[],repeat:p.repeat||'',doneAt:'',created:Date.now(),time:p.time||'',remind:p.time?'0':'',notified:''});
+  $('addDlg').close();save();render();buzz()};
 $('goBtn').onclick=e=>{if($('newTask').value.trim())return;e.preventDefault();$('aSub').hidden=!view.startsWith('l:');$('apop').hidden=!$('apop').hidden};
 $('apop').onclick=e=>{const b=e.target.closest('[data-n]');if(!b)return;$('apop').hidden=true;const k=b.dataset.n;
-  if(k==='task'){$('newTask').focus()}
+  if(k==='task'){aP='media';aD='none';$('aTitle').value='';drawAdd();$('addDlg').showModal();$('aTitle').blur()}
   else{nameMode=k==='list'?'new':'newsub';$('nameTitle').textContent=k==='list'?'Nova lista':'Nova sublista';$('nName').value='';$('nameDlg').showModal();setTimeout(()=>$('nName').focus(),50)}};
 document.addEventListener('pointerdown',e=>{if(!$('apop').hidden&&!e.target.closest('#apop,#goBtn'))$('apop').hidden=true});
 document.addEventListener('pointerdown',e=>{if(!$('ppop').hidden&&!e.target.closest('#ppop,#pbtn'))$('ppop').hidden=true});

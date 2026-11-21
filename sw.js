@@ -1,4 +1,4 @@
-const CACHE = 'tarefas-v13';
+const CACHE = 'tarefas-v14';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
