@@ -35,6 +35,11 @@ h1{margin:0;font-size:30px;letter-spacing:-.5px;line-height:1.15;overflow-wrap:a
 .tab.on{background:var(--accent);color:#fff}
 .tab.on b{background:rgba(255,255,255,.25);color:#fff}
 .tab.add{background:none;box-shadow:none;border:1px dashed var(--line);color:var(--muted)}
+.tab{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.tab.drag{position:relative;z-index:5;box-shadow:0 8px 22px rgba(0,0,0,.4);transition:none}
+.tab.drop-l{box-shadow:-5px 0 0 var(--accent),var(--shadow)}
+.tab.drop-r{box-shadow:5px 0 0 var(--accent),var(--shadow)}
+.tabs.dragging{cursor:grabbing}
 h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:18px 20px 8px;display:flex;gap:8px;font-weight:600}
 h2 span{font-weight:400}
 h2.late{color:var(--high)}
@@ -571,11 +576,70 @@ function endGesture(){
 }
 C.addEventListener('touchend',endGesture);C.addEventListener('touchcancel',endGesture);
 $('tabs').onclick=e=>{
+  if(dragSuppress){dragSuppress=false;return}
   const b=e.target.closest('.tab');if(!b)return;
   if(b.dataset.add){nameMode='new';$('nameTitle').textContent='Nova lista';$('nName').value='';$('nameDlg').showModal();setTimeout(()=>$('nName').focus(),50);return}
   resetSel();view=b.dataset.v;showDone=false;render();
   $('tabs').querySelector('.on')?.scrollIntoView({inline:'center',block:'nearest'});
 };
+/* ---------- reordenar listas: segure uma aba e arraste ---------- */
+let dragSuppress=false,dr=null;
+const tabsEl=$('tabs');
+function dragTabs(){return[...tabsEl.querySelectorAll('.tab[data-v^="l:"]')]}
+function dragUpdate(){
+  if(!dr||!dr.active)return;
+  dr.btn.style.transform=`translateX(${dr.x-dr.x0+(tabsEl.scrollLeft-dr.s0)}px) scale(1.06)`;
+  const others=dragTabs().filter(t=>t!==dr.btn);
+  let idx=0;
+  others.forEach(t=>{const r=t.getBoundingClientRect();if(dr.x>r.left+r.width/2)idx++});
+  others.forEach(t=>t.classList.remove('drop-l','drop-r'));
+  if(others.length){if(idx<others.length)others[idx].classList.add('drop-l');else others[others.length-1].classList.add('drop-r')}
+  dr.idx=idx;dr.others=others.map(t=>t.dataset.v.slice(2));
+}
+function dragStop(){
+  if(!dr)return;
+  clearTimeout(dr.timer);clearInterval(dr.scroller);
+  dr.btn.style.transform='';dr.btn.classList.remove('drag');
+  dragTabs().forEach(t=>t.classList.remove('drop-l','drop-r'));
+  tabsEl.classList.remove('dragging');
+  dr=null;
+}
+tabsEl.addEventListener('contextmenu',e=>{if(e.target.closest('.tab[data-v^="l:"]'))e.preventDefault()});
+tabsEl.addEventListener('touchmove',e=>{if(dr&&dr.active)e.preventDefault()},{passive:false});
+tabsEl.addEventListener('pointerdown',e=>{
+  const b=e.target.closest('.tab');
+  if(!b||!b.dataset.v||!b.dataset.v.startsWith('l:')||state.lists.length<2||(e.pointerType==='mouse'&&e.button!==0))return;
+  dragStop();
+  dr={btn:b,pid:e.pointerId,x0:e.clientX,y0:e.clientY,x:e.clientX,s0:tabsEl.scrollLeft,active:false};
+  dr.timer=setTimeout(()=>{
+    if(!dr)return;
+    dr.active=true;b.classList.add('drag');tabsEl.classList.add('dragging');
+    try{navigator.vibrate&&navigator.vibrate(15)}catch(_){}
+    dr.scroller=setInterval(()=>{
+      const r=tabsEl.getBoundingClientRect();
+      if(dr.x<r.left+40)tabsEl.scrollLeft-=8;else if(dr.x>r.right-40)tabsEl.scrollLeft+=8;
+      dragUpdate();
+    },16);
+    dragUpdate();
+  },380);
+});
+window.addEventListener('pointermove',e=>{
+  if(!dr||e.pointerId!==dr.pid)return;
+  dr.x=e.clientX;
+  if(!dr.active){if(Math.hypot(e.clientX-dr.x0,e.clientY-dr.y0)>8)dragStop();return}
+  dragUpdate();
+});
+window.addEventListener('pointerup',e=>{
+  if(!dr||e.pointerId!==dr.pid)return;
+  if(!dr.active){dragStop();return}
+  const name=dr.btn.dataset.v.slice(2),order=dr.others.slice();
+  order.splice(dr.idx,0,name);
+  dragStop();
+  dragSuppress=true;setTimeout(()=>{dragSuppress=false},350);
+  if(order.join('\u0001')!==state.lists.join('\u0001')){state.lists=order;save();toast('Ordem das listas salva')}
+  render();
+});
+window.addEventListener('pointercancel',e=>{if(dr&&e.pointerId===dr.pid)dragStop()});
 $('btnSearch').onclick=()=>{resetSel();searchOn=!searchOn;$('q').classList.toggle('on',searchOn);if(searchOn)$('q').focus();else $('q').value='';render()};
 $('q').oninput=()=>{resetSel();render()};
 
