@@ -18,7 +18,7 @@ html{color-scheme:light dark}
 body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:calc(120px + env(safe-area-inset-bottom))}
 button{font:inherit;color:inherit}
 header,.tabs,#content,.prog{max-width:640px;margin-left:auto;margin-right:auto}
-header{padding:calc(18px + env(safe-area-inset-top)) 20px 4px;display:flex;align-items:flex-start;gap:8px}
+header{padding:calc(18px + env(safe-area-inset-top)) 20px 4px;display:flex;align-items:flex-start;gap:8px;position:relative}
 .hd{flex:1;min-width:0}
 h1{margin:0;font-size:30px;letter-spacing:-.5px;line-height:1.15;overflow-wrap:anywhere}
 .sub{color:var(--muted);font-size:14px;margin-top:2px}
@@ -101,6 +101,10 @@ ul{list-style:none;margin:0;padding:0 16px}
 .pbtn i,.ppop i{display:block;width:18px;height:18px;border-radius:50%;background:var(--mid)}
 .pbtn i.d-alta,.ppop i.d-alta{background:var(--high)}.pbtn i.d-media,.ppop i.d-media{background:var(--mid)}.pbtn i.d-baixa,.ppop i.d-baixa{background:var(--blue)}
 .ppop{position:absolute;left:0;bottom:calc(100% - 14px);background:var(--card);border-radius:16px;box-shadow:0 8px 28px rgba(0,0,0,.35);padding:6px;display:flex;flex-direction:column;min-width:150px;z-index:20}
+.apop{position:absolute;right:20px;top:calc(62px + env(safe-area-inset-top));background:var(--card);border-radius:16px;box-shadow:0 8px 28px rgba(0,0,0,.35);padding:6px;display:flex;flex-direction:column;min-width:170px;z-index:30}
+.apop[hidden]{display:none}
+.apop button{border:0;background:none;color:var(--text);font-size:16px;padding:12px 14px;border-radius:10px;cursor:pointer;text-align:left}
+.apop button:active{background:var(--accent-soft)}
 .ppop[hidden]{display:none}
 .ppop button{display:flex;align-items:center;gap:12px;border:0;background:none;color:var(--text);font-size:16px;padding:11px 12px;border-radius:10px;cursor:pointer;text-align:left}
 .ppop button.on{background:var(--accent-soft);font-weight:600}
@@ -155,6 +159,8 @@ dialog::backdrop{background:rgba(0,0,0,.45);backdrop-filter:blur(2px)}
 <body>
 <header>
   <div class="hd"><h1 id="title"></h1><div class="sub" id="sub"></div></div>
+  <button class="ib" id="btnAdd" aria-label="Adicionar"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+  <div class="apop" id="apop" hidden><button data-n="task">Tarefa</button><button data-n="list">Lista</button><button data-n="sub" id="aSub" hidden>Sublista</button></div>
   <button class="ib" id="btnSearch" aria-label="Buscar"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
   <button class="ib" id="btnMenu" aria-label="Mais opções"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
 </header>
@@ -740,6 +746,11 @@ function drawPrio(){
 }
 $('pbtn').onclick=()=>{$('ppop').hidden=!$('ppop').hidden;drawPrio()};
 $('ppop').onclick=e=>{const b=e.target.closest('[data-p]');if(!b)return;newPrio=b.dataset.p;$('ppop').hidden=true;drawPrio();$('newTask').focus()};
+$('btnAdd').onclick=()=>{const a=$('apop');$('aSub').hidden=!view.startsWith('l:');a.hidden=!a.hidden};
+$('apop').onclick=e=>{const b=e.target.closest('[data-n]');if(!b)return;$('apop').hidden=true;const k=b.dataset.n;
+  if(k==='task'){window.scrollTo({top:document.body.scrollHeight});$('newTask').focus()}
+  else{nameMode=k==='list'?'new':'newsub';$('nameTitle').textContent=k==='list'?'Nova lista':'Nova sublista';$('nName').value='';$('nameDlg').showModal();setTimeout(()=>$('nName').focus(),50)}};
+document.addEventListener('pointerdown',e=>{if(!$('apop').hidden&&!e.target.closest('#apop,#btnAdd'))$('apop').hidden=true});
 document.addEventListener('pointerdown',e=>{if(!$('ppop').hidden&&!e.target.closest('#ppop,#pbtn'))$('ppop').hidden=true});
 $('form').onsubmit=e=>{
   e.preventDefault();
