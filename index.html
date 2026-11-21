@@ -87,7 +87,7 @@ ul{list-style:none;margin:0;padding:0 16px}
 .more b{font-size:12px;background:var(--accent-soft);color:var(--accent);border-radius:99px;padding:0 7px;letter-spacing:0}
 .more i{font-style:normal;margin-left:auto}
 .donebtn{display:block;margin:14px auto 0;border:0;background:none;color:var(--muted);font-size:14px;padding:8px 14px;cursor:pointer}
-.empty{text-align:center;color:var(--muted);padding:56px 24px}
+.empty{text-align:center;color:var(--muted);padding:20px 24px;font-size:14px}
 .empty big{display:block;font-size:40px;margin-bottom:8px}
 .bar{position:fixed;left:0;right:0;bottom:0;padding:24px 16px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bg) 40%)}
 .bar-in{max-width:640px;margin:auto}
@@ -565,8 +565,8 @@ function render(){
     if(showDone)html+=`<ul style="margin-top:8px">${done.sort((a,b)=>(b.doneAt||'').localeCompare(a.doneAt||'')).map(rowHTML).join('')}</ul>`;
   }
   if(!open.length&&!(showDone&&done.length)){
-    const msg=searching?['🔍','Nada encontrado.']:view==='hoje'?(done.length?['🎉','Tudo feito por hoje!']:['✨','Dia livre. Nada para hoje.']):view==='cal'?['🗓️','Nada neste dia.']:['✨','Nada por aqui. Adicione sua primeira tarefa.'];
-    const em=`<div class="empty"><big>${msg[0]}</big>${msg[1]}</div>`;
+    const msg=searching?'Nada encontrado.':view==='hoje'?(done.length?'':'Nada para hoje.'):view==='cal'?'Nada neste dia.':'Nenhuma tarefa.';
+    const em=msg?`<div class="empty">${msg}</div>`:'';
     html=(view==='cal'&&!searching)?html+em:em+html;
   }
   $('content').innerHTML=html;
