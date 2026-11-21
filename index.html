@@ -476,7 +476,7 @@ function rowHTML(t){
   return `<li class="task pr-${t.prio} ${t.done?'done':''} ${justId===t.id?'just':''} ${selIds.has(t.id)?'sel':''}" data-id="${t.id}"><div class="rowin">
     <button class="chk p-${t.prio}" data-a="toggle" aria-label="Concluir"></button>
     <div class="body" data-a="open"><div class="t">${esc(t.title)}</div>
-    <div class="meta">${t.list?`<span class="lst"><i style="background:${listColor(t.list)}"></i>${esc(t.list)}${t.group?' · '+esc(t.group):''}</span>`:''}
+    <div class="meta">${t.list&&!view.startsWith('l:')?`<span class="lst"><i style="background:${listColor(t.list)}"></i>${esc(t.list)}${t.group?' · '+esc(t.group):''}</span>`:(t.list&&t.group?`<span class="lst">${esc(t.group)}</span>`:'')}
     ${t.date?`<span class="${late?'late':''}">${label(t.date)}${t.time?' · '+t.time:''}</span>`:''}
     ${t.time&&t.remind!==''?'<span title="Lembrete">🔔</span>':''}
     ${t.repeat?'<span title="Repete">↻</span>':''}
